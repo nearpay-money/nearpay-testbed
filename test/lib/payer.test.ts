@@ -1,8 +1,15 @@
 /** Scripted payers (T3 human Intents balance, T5 agent) against the mock stack. */
 import { nearSigner, payCheckoutSession, staticSaltProvider } from "@nearpay/agent-signer";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ApiError } from "../../lib/http.js";
 import { merchantDemo } from "../../lib/merchant-demo.js";
-import { attestedAttempt, payFromIntentsBalance, sessionFromUrl } from "../../lib/payer.js";
+import {
+  ATTESTATION_TRIES,
+  attestedAttempt,
+  payFromIntentsBalance,
+  retryUnavailable,
+  sessionFromUrl,
+} from "../../lib/payer.js";
 import { type MockStack, SENTINEL_KEY, startMerchantDemo, startMockStack, USDC } from "../support/mock-stack.js";
 
 let stack: MockStack;
@@ -73,5 +80,55 @@ describe("payers", () => {
     const id = "cs_01jbz9k3m4n5p6q7r8s9t0v1w2";
     expect(sessionFromUrl(`https://pay.x/embed/${id}#${id}_secret_${"a".repeat(32)}`).sessionId).toBe(id);
     expect(() => sessionFromUrl(`https://pay.x/c/${id}`)).toThrow(/client secret/);
+  });
+
+  describe("sentinel unavailable (503 attestation_unavailable)", () => {
+    const unavailable = () => new ApiError("503", 503, "attestation_unavailable", "req_1");
+    const noSleep = async () => {};
+
+    it("asks again with backoff and returns the first answer", async () => {
+      const waits: number[] = [];
+      let calls = 0;
+      const r = await retryUnavailable(
+        async () => {
+          calls++;
+          if (calls < 3) throw unavailable();
+          return "signed";
+        },
+        async (ms) => {
+          waits.push(ms);
+        },
+      );
+      expect(r).toBe("signed");
+      expect(waits).toStrictEqual([1000, 2000]);
+    });
+
+    it("gives up after a bounded number of tries", async () => {
+      let calls = 0;
+      await expect(
+        retryUnavailable(async () => {
+          calls++;
+          throw unavailable();
+        }, noSleep),
+      ).rejects.toMatchObject({ code: "attestation_unavailable" });
+      expect(calls).toBe(ATTESTATION_TRIES);
+    });
+
+    it("never retries a refusal or any other error", async () => {
+      for (const e of [
+        new ApiError("409", 409, "attestation_refused", undefined),
+        new ApiError("401", 401, "ticket_invalid", undefined),
+        new Error("network"),
+      ]) {
+        let calls = 0;
+        await expect(
+          retryUnavailable(async () => {
+            calls++;
+            throw e;
+          }, noSleep),
+        ).rejects.toBe(e);
+        expect(calls).toBe(1);
+      }
+    });
   });
 });
