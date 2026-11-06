@@ -22,7 +22,7 @@ import {
   submitSignedIntent,
   type z,
 } from "@nearpay/spec";
-import { call } from "./http.js";
+import { ApiError, call } from "./http.js";
 
 /** Cloudflare's always-pass test token: the local stack uses the always-pass test secret. */
 export const TURNSTILE_TEST_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
@@ -41,6 +41,31 @@ export interface PayerContext {
   pinnedKeys: readonly PinnedSentinelKey[];
   fetch?: typeof fetch;
   now?: () => number;
+  /** Backoff between attestation retries (tests inject a no-op). */
+  sleep?: (ms: number) => Promise<void>;
+}
+
+/** Tries for `503 attestation_unavailable` (sentinel's fail-closed answer while a dependency is slow). */
+export const ATTESTATION_TRIES = 4;
+
+/**
+ * Asks sentinel again while it answers `503 attestation_unavailable` ("try again shortly"; the hosted
+ * checkout offers the same retry from `verify_failed`, checkout LLD §5). Every other answer, including
+ * refusals (`409 attestation_refused`, `401 ticket_invalid`), is final, and whatever comes back is
+ * still verified against the pinned key: the retry never relaxes the co-signature check.
+ */
+export async function retryUnavailable<T>(
+  attest: () => Promise<T>,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await attest();
+    } catch (e) {
+      if (!(e instanceof ApiError && e.code === "attestation_unavailable") || i >= ATTESTATION_TRIES) throw e;
+      await sleep(1000 * i);
+    }
+  }
 }
 
 export interface AttestedAttempt {
@@ -120,17 +145,19 @@ export async function attestedAttempt(
             body: { requirement },
           };
         })();
-  const signed = await call<unknown>(createDepositInstructionsAttestation, {
-    base: c.apiBase,
-    ...(c.fetch ? { fetch: c.fetch } : {}),
-    body: {
-      livemode: attempt.livemode,
-      kind: attempt.method,
-      attempt_id: attempt.id,
-      attestation_ticket: attempt.attestation_ticket,
-      ...request.body,
-    },
-  });
+  const attest = () =>
+    call<unknown>(createDepositInstructionsAttestation, {
+      base: c.apiBase,
+      ...(c.fetch ? { fetch: c.fetch } : {}),
+      body: {
+        livemode: attempt.livemode,
+        kind: attempt.method,
+        attempt_id: attempt.id,
+        attestation_ticket: attempt.attestation_ticket,
+        ...request.body,
+      },
+    });
+  const signed = await retryUnavailable(attest, c.sleep);
   const check = verifyAttestation(signed, request.expected, { pinnedKeys: c.pinnedKeys, now: (c.now ?? Date.now)() });
   if (!check.ok) throw new Error(`sentinel co-signature refused: ${check.reason} (${check.detail})`);
   return {

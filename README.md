@@ -77,17 +77,43 @@ Each runs `docker compose -p nearpay … exec -T <svc>-api /nodejs/bin/node dist
 
 ## E2E (step 1.4)
 
+Against nearpay-deploy's stack (`scripts/up.sh` with the `merchant-demo` profile, then `scripts/seed.sh data`):
+
 ```sh
-NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem pnpm test:e2e     # T1–T7 + scenarios 00/03/04/05/06
-NP_E2E_SLOW=1 … pnpm test:e2e                                               # + 01, 02, 07
-NP_E2E=1 pnpm test:pw                                                       # hosted checkout in Chrome
-NP_E2E=mock pnpm exec vitest run --project e2e                              # suite logic against the mock stack
+export NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem    # set it explicitly; trusts the local CA
+pnpm test:e2e                       # T2–T7 + scenarios 00/03/04/05/06 (~3 min)
+NP_E2E_SLOW=1 pnpm test:e2e         # + 01, 02, 07 side by side (~35 min: 02 waits for the 30 min quote deadline)
+NP_E2E=1 pnpm test:pw               # Chrome: hosted checkout (T2/T6 UI) and dashboard onboarding (T1)
+NP_E2E=mock pnpm exec vitest run --project e2e                      # suite logic against the mock stack
 ```
+
+| Suite                                 | Covers                                                                                                                                                                                                                             |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `e2e/api/checkout`                    | T2/T6: session → sentinel-verified instructions → simulated deposit → signed webhooks; INV-2 evidence                                                                                                                              |
+| `e2e/api/scenarios`                   | sandbox 00–07 (`lib/scenarios.ts`): final intent/attempt/session state, required and forbidden webhooks, statement lines                                                                                                           |
+| `e2e/api/kill-switch`                 | T7: spoofed request refused without engaging; drill engage → rails stops quoting → ops CLI release                                                                                                                                 |
+| `e2e/api/onboarding`                  | T1 ops half: the seeded merchant is visible to ops                                                                                                                                                                                 |
+| `e2e/checkout/intents`, `e2e/agent/*` | T3 (Intents balance, NEP-413), T4 (x402 `/premium`), T5 (agent pays a session)                                                                                                                                                     |
+| `e2e/checkout/hosted.pw.ts`           | the hosted checkout in Chrome: manual path, verified merchant + fingerprint, address after network confirmation, simulate, redirect, webhook                                                                                       |
+| `e2e/dashboard/onboarding.pw.ts`      | T1 in Chrome: sign-up → magic link (Mailpit) → passkey (CDP virtual authenticator) → live NEAR Intents destination signed with NEP-413 by a fresh implicit account → cool-off skip (ops CLI) → KYB → ops decision → `live_enabled` |
+
+Scenario outcomes (domain-model §4–§5): 00 succeeded; 01 processing then succeeded; 02 attempt refunded at the
+deadline, intent back to `requires_payment`, session open; 03 succeeded, excess refunded (no overpayment); 04
+`FAILED` after the deposit → attempt `held` (`failed_after_deposit`), intent `requires_review`
+(`verification_held`), no success or failure event; 05 `requires_review` (`short_settlement`), no succeeded event;
+06 succeeded + `overpaid` (`duplicate`); 07 settles after the session's `expires_at`, `late: true`.
+
+The browser tests stub Cloudflare Turnstile with the dummy token of the always-pass test sitekey (services
+answer the local test secret themselves) and serve an empty NEAR Connect manifest, so no third-party script
+is loaded. Chrome trusts the local certificate through its pinned SPKI (`playwright.config.ts`), which
+WebAuthn needs. The scripted payer asks sentinel again (up to 4 tries) while it answers
+`503 attestation_unavailable`; every answer is still verified against the pinned key.
 
 ## Status
 
 Step 1.3: merchant-demo, demo scripts, Stage 1 ops CLI and E2E scaffolding with unit + mock-backed
-tests. Full-stack runs are step 1.4.
+tests. Step 1.4: every suite above green against the full Compose stack in test mode (traces T1–T7,
+sandbox scenarios 00–07).
 
 ## Built with
 
