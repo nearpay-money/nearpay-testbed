@@ -1,30 +1,16 @@
 /**
- * Webhook receiver (api-conventions §9, lld/webhooks.md §6): verifies `NearPay-Signature` v1
- * (HMAC-SHA256 over `<t>.<raw body>` with the endpoint secret, any of several v1 values, constant-time,
- * 300 s tolerance) on the raw body bytes, then keeps the event (deduplicated by id) for the demo page
- * and the demo scripts.
- *
- * TODO(step 1.4): switch to `@nearpay/node` `webhooks.constructEvent` once it is in the local registry.
+ * Webhook receiver (api-conventions §9, lld/webhooks.md §6): `@nearpay/node` `constructEvent` verifies
+ * `NearPay-Signature` v1 (HMAC-SHA256 over `<t>.<raw body>`, any v1 value, constant time, 300 s) on the
+ * raw body bytes; the event is then kept (deduplicated by id) for the demo page and the demo scripts.
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
-import {
-  EventEnvelopeLoose,
-  parseSignatureHeader,
-  signedPayload,
-  WEBHOOK_TOLERANCE_SECONDS,
-  type z,
-} from "@nearpay/spec";
+import { constructEvent } from "@nearpay/node";
+import { EventEnvelopeLoose, type z } from "@nearpay/spec";
 
 export type WebhookEvent = z.output<typeof EventEnvelopeLoose>;
 
-export type VerifyFailure =
-  | "missing_header"
-  | "malformed_header"
-  | "timestamp_out_of_tolerance"
-  | "no_matching_signature"
-  | "invalid_body";
+export type VerifyFailure = "missing_header" | "signature_invalid" | "invalid_body";
 
-export type VerifyResult = { ok: true; event: WebhookEvent } | { ok: false; reason: VerifyFailure };
+export type VerifyResult = { ok: true; event: WebhookEvent } | { ok: false; reason: VerifyFailure; detail?: string };
 
 export function verifyWebhook(
   rawBody: Buffer | string,
@@ -33,25 +19,18 @@ export function verifyWebhook(
   opts: { now?: number; toleranceSec?: number } = {},
 ): VerifyResult {
   if (!header) return { ok: false, reason: "missing_header" };
-  const parsed = parseSignatureHeader(header);
-  if (!parsed) return { ok: false, reason: "malformed_header" };
-  const now = Math.floor((opts.now ?? Date.now()) / 1000);
-  if (Math.abs(now - parsed.timestamp) > (opts.toleranceSec ?? WEBHOOK_TOLERANCE_SECONDS)) {
-    return { ok: false, reason: "timestamp_out_of_tolerance" };
-  }
-  const body = typeof rawBody === "string" ? rawBody : rawBody.toString("utf8");
-  const msg = Buffer.from(signedPayload(parsed.timestamp, body), "utf8");
-  const match = secrets.some((secret) => {
-    const expected = createHmac("sha256", Buffer.from(secret, "utf8")).update(msg).digest();
-    return parsed.v1.some((v) => {
-      const got = Buffer.from(v, "hex");
-      return got.length === expected.length && timingSafeEqual(got, expected);
+  if (secrets.length === 0) return { ok: false, reason: "signature_invalid", detail: "no webhook secret configured" };
+  try {
+    constructEvent(rawBody, header, secrets, {
+      ...(opts.now !== undefined ? { now: Math.floor(opts.now / 1000) } : {}),
+      ...(opts.toleranceSec !== undefined ? { toleranceSec: opts.toleranceSec } : {}),
     });
-  });
-  if (!match) return { ok: false, reason: "no_matching_signature" };
+  } catch (e) {
+    return { ok: false, reason: "signature_invalid", detail: (e as Error).message };
+  }
   let json: unknown;
   try {
-    json = JSON.parse(body);
+    json = JSON.parse(typeof rawBody === "string" ? rawBody : rawBody.toString("utf8"));
   } catch {
     return { ok: false, reason: "invalid_body" };
   }

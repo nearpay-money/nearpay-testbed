@@ -26,5 +26,5 @@ The demo merchant backend of the Stage 1 demo (`nearpay-brain/roadmap/developmen
 | `NP_DEMO_PREMIUM_AMOUNT`, `NP_DEMO_PREMIUM_ASSET` | `10000`, account default               | x402 price                                                                                                                                                                   |
 | `NP_ENV`, `PORT`                                  | `local`, `3000`                        |                                                                                                                                                                              |
 
-Uses the API through spec route tables and `fetch` until `@nearpay/node` is in the local registry.
+Uses `@nearpay/node` 0.1.0 for the API (automatic Idempotency-Key, retries) and `constructEvent` for webhooks.
 Tests live in `../test/merchant-demo/` (run from the repository root).

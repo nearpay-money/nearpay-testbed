@@ -193,7 +193,7 @@ export function createApp(deps: AppDeps): Express {
       deps.now ? { now: deps.now() } : {},
     );
     if (!r.ok) {
-      log("webhook rejected", { reason: r.reason });
+      log("webhook rejected", { reason: r.reason, detail: r.detail });
       return res.status(400).json({ error: r.reason });
     }
     const fresh = events.add(r.event);

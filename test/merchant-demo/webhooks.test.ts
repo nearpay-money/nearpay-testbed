@@ -22,13 +22,16 @@ describe("verifyWebhook", () => {
       const r = verifyWebhook(n.raw_body, n.header, [v.secret], at(n.now));
       return r.ok ? "ok" : r.reason;
     });
-    expect(reasons).toStrictEqual(["no_matching_signature", "timestamp_out_of_tolerance", "no_matching_signature"]);
+    expect(reasons).toStrictEqual(["signature_invalid", "signature_invalid", "signature_invalid"]);
   });
 
   it("rejects missing/malformed headers and unsigned garbage", () => {
     expect(verifyWebhook(v.raw_body, undefined, [v.secret])).toMatchObject({ reason: "missing_header" });
-    expect(verifyWebhook(v.raw_body, "t=abc", [v.secret])).toMatchObject({ reason: "malformed_header" });
-    expect(verifyWebhook(v.raw_body, v.header, [], at(v.verify_at))).toMatchObject({ reason: "no_matching_signature" });
+    expect(verifyWebhook(v.raw_body, "t=abc", [v.secret])).toMatchObject({ reason: "signature_invalid" });
+    expect(verifyWebhook(v.raw_body, v.header, [], at(v.verify_at))).toMatchObject({ reason: "signature_invalid" });
+    expect(verifyWebhook(v.raw_body, v.header, [v.secret], { ...at(v.verify_at + 1000), toleranceSec: 2000 }).ok).toBe(
+      true,
+    );
   });
 
   it("rejects a correctly signed body that is not an event", async () => {
@@ -36,7 +39,7 @@ describe("verifyWebhook", () => {
     const body = "not json";
     const t = 1_800_000_000;
     const sig = createHmac("sha256", v.secret).update(`${t}.${body}`).digest("hex");
-    expect(verifyWebhook(body, `t=${t},v1=${sig}`, [v.secret], at(t))).toMatchObject({ reason: "invalid_body" });
+    expect(verifyWebhook(body, `t=${t},v1=${sig}`, [v.secret], at(t)).ok).toBe(false); // the SDK refuses non-JSON
     const body2 = '{"id":"x"}';
     const sig2 = createHmac("sha256", v.secret).update(`${t}.${body2}`).digest("hex");
     expect(verifyWebhook(body2, `t=${t},v1=${sig2}`, [v.secret], at(t))).toMatchObject({ reason: "invalid_body" });

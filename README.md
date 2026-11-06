@@ -91,6 +91,6 @@ tests. Full-stack runs are step 1.4.
 
 ## Built with
 
-Libraries (hackathon rule Q-005): Express, zod, `@nearpay/spec`, `@nearpay/x402`, `@nearpay/agent-signer`;
+Libraries (hackathon rule Q-005): Express, zod, `@nearpay/spec`, `@nearpay/node`, `@nearpay/x402`, `@nearpay/agent-signer`;
 development — TypeScript, Vitest, Playwright, Biome, tsx, `@noble/curves`, canonicalize. Code and
 documentation are written with AI assistance (Claude) under human direction and review.

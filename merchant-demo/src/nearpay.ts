@@ -1,19 +1,6 @@
-/**
- * The few NearPay merchant routes the demo calls, driven by the spec route tables (fetch + spec types).
- * TODO(step 1.4): replace with `@nearpay/node` (`nearpay.checkout.sessions.create`) once it is
- * published to the local registry; the calls and the Idempotency-Key behaviour stay the same.
- */
-import { randomUUID } from "node:crypto";
-import {
-  type AnyRoute,
-  API_VERSION,
-  type CheckoutSession,
-  createCheckoutSession,
-  ErrorEnvelope,
-  getCheckoutSession,
-  HEADERS,
-  type RouteBody,
-} from "@nearpay/spec";
+/** The NearPay merchant calls the demo makes, through `@nearpay/node` (lld/sdks-and-tools.md §1). */
+import { NearPay, NearPayError } from "@nearpay/node";
+import type { CheckoutSession, createCheckoutSession, RouteBody } from "@nearpay/spec";
 
 export class NearPayApiError extends Error {
   constructor(
@@ -34,44 +21,28 @@ export interface NearPayClient {
   getCheckoutSession(id: string): Promise<CheckoutSession>;
 }
 
-export function nearpayClient(o: { apiBase: string; secretKey: string; fetch?: typeof fetch }): NearPayClient {
-  const f = o.fetch ?? fetch;
-  async function call(route: AnyRoute, path: string, body?: unknown, idempotencyKey?: string): Promise<unknown> {
-    let res: Response;
-    try {
-      res = await f(`${o.apiBase}${path}`, {
-        method: route.method,
-        headers: {
-          accept: "application/json",
-          [HEADERS.authorization]: `Bearer ${o.secretKey}`,
-          [HEADERS.apiVersion]: API_VERSION,
-          ...(body !== undefined ? { "content-type": "application/json" } : {}),
-          ...(route.method === "POST" ? { [HEADERS.idempotencyKey]: idempotencyKey ?? randomUUID() } : {}),
-        },
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-        signal: AbortSignal.timeout(30_000),
-      });
-    } catch (e) {
-      throw new NearPayApiError(`${route.id}: ${(e as Error).message}`, 0);
-    }
-    const json: unknown = await res.json().catch(() => null);
-    if (res.status !== route.status) {
-      const env = ErrorEnvelope.safeParse(json);
-      throw new NearPayApiError(
-        `${route.id} failed (${res.status}${env.success ? ` ${env.data.error.code}: ${env.data.error.message}` : ""})`,
-        res.status,
-        env.success ? env.data.error.code : undefined,
-      );
-    }
-    return (route.response as NonNullable<AnyRoute["response"]>).parse(json);
+async function mapped<T>(p: Promise<T>): Promise<T> {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof NearPayError) throw new NearPayApiError(e.message, e.statusCode ?? 0, e.code);
+    throw e;
   }
+}
+
+export function nearpayClient(o: { apiBase: string; secretKey: string; fetch?: typeof fetch }): NearPayClient {
+  const nearpay = new NearPay(o.secretKey, {
+    baseUrl: o.apiBase,
+    appInfo: "merchant-demo/0.1.0",
+    ...(o.fetch ? { fetch: o.fetch } : {}),
+  });
   return {
-    createCheckoutSession: (body, key) =>
-      call(createCheckoutSession, createCheckoutSession.path, body, key) as Promise<CheckoutSession>,
-    getCheckoutSession: (id) =>
-      call(
-        getCheckoutSession,
-        `${getCheckoutSession.path.replace("{id}", encodeURIComponent(id))}?expand[]=payment_intent`,
+    // The SDK adds an Idempotency-Key (UUIDv4) and reuses it across its retries.
+    createCheckoutSession: (body, idempotencyKey) =>
+      mapped(
+        nearpay.checkout.sessions.create(body, idempotencyKey ? { idempotencyKey } : undefined),
       ) as Promise<CheckoutSession>,
+    getCheckoutSession: (id) =>
+      mapped(nearpay.checkout.sessions.retrieve(id, { expand: ["payment_intent"] })) as Promise<CheckoutSession>,
   };
 }
