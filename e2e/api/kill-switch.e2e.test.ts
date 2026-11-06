@@ -1,7 +1,8 @@
 /**
  * T7 — kill switch: a spoofed co-signing request is refused without engaging anything (L-SN-01);
- * an operator drill engages it → rails stops live quoting; the Stage 1 ops CLI release resumes it.
- * Real stack only (in-container ops CLIs via docker compose exec).
+ * an operator drill engages it → `evt.sentinel.kill_switch.engaged` → rails stops live quoting and
+ * agentpay pauses live x402 settles and checkout relays (agentpay §8); the Stage 1 ops CLI release
+ * resumes both. Real stack only (in-container ops CLIs via docker compose exec).
  */
 import { createDepositInstructionsAttestation } from "@nearpay/spec";
 import { afterAll, describe, expect, it } from "vitest";
@@ -14,6 +15,11 @@ const quoting = (): boolean | undefined => {
   const f = ops("rails-api", ["flags"]).json as { name: string; value: boolean }[] | undefined;
   return f?.find((x) => x.name === "quoting_enabled")?.value;
 };
+
+/** agentpay `ops.js kill-switch` prints `{kill_switch: {engaged, reason, …}}`. */
+const agentpayPaused = (): boolean | undefined =>
+  (ops("agentpay-api", ["kill-switch"]).json as { kill_switch?: { engaged: boolean } } | undefined)?.kill_switch
+    ?.engaged;
 
 describe.skipIf(!realStack)("T7 kill switch", () => {
   afterAll(() => {
@@ -50,6 +56,10 @@ describe.skipIf(!realStack)("T7 kill switch", () => {
       timeoutMs: 30_000,
       what: "rails quoting_enabled=false",
     });
+    await waitFor(async () => (agentpayPaused() === true ? true : undefined), {
+      timeoutMs: 30_000,
+      what: "agentpay kill switch engaged",
+    });
     const { runCli } = await import("../../ops/cli.js");
     expect(
       runCli(["kill-switch-release", "testbed", "e2e", "drill", "done", "--yes"], {
@@ -60,6 +70,10 @@ describe.skipIf(!realStack)("T7 kill switch", () => {
     await waitFor(async () => (quoting() === true ? true : undefined), {
       timeoutMs: 30_000,
       what: "rails quoting_enabled=true",
+    });
+    await waitFor(async () => (agentpayPaused() === false ? true : undefined), {
+      timeoutMs: 30_000,
+      what: "agentpay kill switch released",
     });
   });
 });
