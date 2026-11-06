@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "noEmit": true, "types": ["node"] },
+  "include": ["lib", "demo", "ops", "e2e", "test", "vitest.config.ts", "playwright.config.ts"]
+}
