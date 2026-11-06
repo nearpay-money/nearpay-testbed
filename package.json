@@ -1,0 +1,53 @@
+{
+  "name": "nearpay-testbed",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NearPay whole-system verification and demos: merchant-demo, demo scripts, Stage 1 ops CLI, E2E suites.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.11.0 <23"
+  },
+  "scripts": {
+    "setup": "pnpm install && pnpm -C merchant-demo install",
+    "typecheck": "tsc -p tsconfig.json --noEmit && pnpm -C merchant-demo typecheck",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run --project unit",
+    "coverage": "vitest run --project unit --coverage",
+    "test:pw": "playwright test",
+    "test:e2e": "NP_E2E=1 vitest run --project e2e",
+    "build": "pnpm -C merchant-demo build",
+    "verify": "pnpm typecheck && pnpm lint && pnpm coverage && pnpm test:pw && pnpm build",
+    "demo:checkout": "NODE_EXTRA_CA_CERTS=${NODE_EXTRA_CA_CERTS:-../nearpay-deploy/.secrets/tls/ca.pem} tsx demo/checkout.ts",
+    "demo:agent": "NODE_EXTRA_CA_CERTS=${NODE_EXTRA_CA_CERTS:-../nearpay-deploy/.secrets/tls/ca.pem} tsx demo/agent.ts",
+    "ops": "tsx ops/cli.ts"
+  },
+  "dependencies": {
+    "@nearpay/agent-signer": "0.1.1",
+    "@nearpay/spec": "0.1.4",
+    "@nearpay/x402": "0.1.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.5",
+    "@nearpay-internal/intents": "0.1.2",
+    "@noble/curves": "2.4.0",
+    "@playwright/test": "1.64.1",
+    "@types/node": "22.20.5",
+    "@vitest/coverage-v8": "2.1.9",
+    "canonicalize": "5.1.0",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  },
+  "pnpm": {
+    "overrides": {
+      "@nearpay/spec": "0.1.4"
+    },
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
