@@ -45,6 +45,8 @@ pnpm setup            # root + merchant-demo installs (@nearpay/* from the local
 pnpm verify           # typecheck, lint, unit + mock-backed tests (coverage gate), Playwright (system Chrome), build
 ```
 
+Node.js 22 is the tested version; Node 24 works, with pnpm's `Unsupported engine` warning.
+
 ## Demo (Stage 1 demo script, test mode against the local stack)
 
 Prerequisites: `nearpay-deploy/scripts/up.sh` (with the `merchant-demo` profile) and `scripts/seed.sh data`
@@ -118,35 +120,47 @@ NearPay holds a payer's or a merchant's keys.
 
 **1. What the owner provides**
 
-| Item                                                                                                  | Where it goes                                                                                        | Used for                                                |
-| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Treasury NEAR account (receives fees)                                                                 | `NP_TREASURY_ACCOUNT` in `nearpay-deploy/compose/env/local.env`                                      | fee destination in every requirement and quote          |
-| Relayer NEAR account with ~1 NEAR for gas                                                             | `NP_RELAYER_ACCOUNT` (same file)                                                                     | submits agents' signed intents to `intents.near`        |
-| 4 function-call access keys of the relayer on `intents.near`                                          | `nearpay-deploy/.secrets/live/relayer_key_1` … `relayer_key_4` (near-cli JSON or `ed25519:…`)        | agentpay batcher; one key per in-flight batch           |
-| NEAR RPC endpoints (your own key preferred)                                                           | `NP_NEAR_RPC_URLS` (comma-separated)                                                                 | rails, agentpay, the agent's nonce salt                 |
-| Base / Arbitrum RPC endpoints                                                                         | `NP_EVM_RPC_URLS_8453`, `NP_EVM_RPC_URLS_42161`                                                      | deposit watchers and receipt verification               |
-| 1Click API key (optional)                                                                             | `.secrets/live/oneclick_api_key`                                                                     | quotes without 1Click's unauthenticated fee             |
-| NEAR Intents Explorer token (optional)                                                                | `.secrets/live/explorer_token` and `NP_EXPLORER_ENABLED=true`                                        | faster provider status                                  |
-| Merchant NEAR account: an implicit account's key (near-cli JSON), or a wallet (e.g. via NEAR Connect) | `nearpay-deploy/.secrets/accounts/merchant.json` for `pnpm onboard:live`, or signed in the dashboard | destination attestation (NEP-413); receives the payouts |
-| Payer EVM wallet with ~3 USDC on Base (or Arbitrum) + a little ETH for gas                            | the payer's browser                                                                                  | demo step 3                                             |
-| Agent NEAR account with ~1 USDC in its NEAR Intents balance                                           | `NP_AGENT_SECRET_KEY` (or `_FILE`) and `NP_AGENT_ACCOUNT` (default: the key's implicit account)      | demo step 5                                             |
+| Item                                                                                                  | Where it goes                                                                                                                | Used for                                                |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Treasury NEAR account (receives fees)                                                                 | `NP_TREASURY_ACCOUNT` in `nearpay-deploy/compose/env/local.env`                                                              | fee destination in every requirement and quote          |
+| Relayer NEAR account with ~1 NEAR for gas                                                             | `NP_RELAYER_ACCOUNT` (same file)                                                                                             | submits agents' signed intents to `intents.near`        |
+| 4 function-call access keys of the relayer on `intents.near`                                          | `nearpay-deploy/.secrets/live/relayer_key_1` … `relayer_key_4` (near-cli JSON or `ed25519:…`)                                | agentpay batcher; one key per in-flight batch           |
+| NEAR RPC endpoints (your own key preferred)                                                           | `NP_NEAR_RPC_URLS` (comma-separated)                                                                                         | rails, agentpay, the agent's nonce salt                 |
+| Base / Arbitrum RPC endpoints                                                                         | `NP_EVM_RPC_URLS_8453`, `NP_EVM_RPC_URLS_42161`                                                                              | deposit watchers and receipt verification               |
+| 1Click API key (optional)                                                                             | `.secrets/live/oneclick_api_key`                                                                                             | quotes without 1Click's unauthenticated fee             |
+| NEAR Intents Explorer token (optional)                                                                | `.secrets/live/explorer_token` and `NP_EXPLORER_ENABLED=true`                                                                | faster provider status                                  |
+| Merchant NEAR account: an implicit account's key (near-cli JSON), or a wallet (e.g. via NEAR Connect) | `nearpay-deploy/.secrets/accounts/merchant.json` for `pnpm onboard:live`, or signed in the dashboard                         | destination attestation (NEP-413); receives the payouts |
+| Payer EVM wallet with ~3 USDC on Base (or Arbitrum) + a little ETH for gas                            | the payer's browser                                                                                                          | demo step 3                                             |
+| Agent NEAR account with ~1 USDC and **0.2 NEAR** for gas (0.1 is refused: `NotEnoughBalance`)         | `nearpay-deploy/.secrets/accounts/agent.json` (near-cli JSON); for the demo `NP_AGENT_SECRET_KEY(_FILE)`, `NP_AGENT_ACCOUNT` | demo step 5                                             |
 
-Fund the agent by depositing USDC (`nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1`)
-into `intents.near` for that account, for example via near-intents.org or `ft_transfer_call` to `intents.near`.
+Send the agent native USDC (`17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1`) and 0.2 NEAR;
+`live-setup.mjs --deposit all` (step 2) moves the USDC into its NEAR Intents balance.
 
 **2. Bring the stack up in live mode**
 
 ```sh
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0               # Macs with corepack: pnpm never waits on a download prompt
 cd ../nearpay-deploy
-$EDITOR compose/env/local.env           # accounts and RPCs from the table
-scripts/seed.sh live                    # validates .secrets/live/*, writes .secrets/live/compose.live.yaml
-scripts/up.sh local                     # up.sh/down.sh include the live overlay automatically
+$EDITOR compose/env/local.env                          # accounts and RPCs from the table
+scripts/seed.sh live                                   # validates .secrets/live/*, writes .secrets/live/compose.live.yaml
+pnpm -C scripts/live-setup install --frozen-lockfile   # once
+node scripts/live-setup.mjs                            # dry run: on-chain status, who to fund and how much
+node scripts/live-setup.mjs --apply --deposit all      # relayer keys on intents.near + agent USDC deposit (asks y/N)
+scripts/up.sh local                                    # includes the live overlay automatically
+cd ../nearpay-testbed
 ```
+
+`up.sh` builds nearpay-js, nearpay-checkout and nearpay-dashboard itself when their `dist/` is missing or older
+than the repo's HEAD (`--build-sites` forces it); no manual `pnpm build` is needed.
 
 `NP_ENV` stays `local`: the stack runs on your machine, and the local Turnstile test keys stay in place.
 A public deployment needs real Turnstile keys and `NP_ENV=server` (Stage 5).
 
-**3. Demo script**
+**3. Demo script** (from this repo)
+
+```sh
+export NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem   # Node trusts the local stack's TLS CA
+```
 
 1. **Merchant goes live.** One command does the whole step:
 
@@ -198,7 +212,9 @@ A public deployment needs real Turnstile keys and `NP_ENV=server` (Stage 5).
 **Safety.**
 
 - Live keys and `.secrets/` never leave your machine and are never committed.
-- `pnpm ops kill-switch` pauses rails and agentpay at once if anything looks wrong.
+- `pnpm ops kill-switch-engage <reason>` pauses rails and agentpay at once if anything looks wrong (`pnpm ops kill-switch` shows the state).
+- A sentinel `security` refusal of a live address engages the switch and live payments stop. Once checked, resume with
+  `pnpm ops kill-switch-release "<what was checked>" --yes`.
 - Stop with `scripts/down.sh` in nearpay-deploy.
 
 ## Status
