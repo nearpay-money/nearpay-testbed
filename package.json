@@ -22,7 +22,8 @@
     "verify": "pnpm typecheck && pnpm lint && pnpm coverage && pnpm test:pw && pnpm build",
     "demo:checkout": "NODE_EXTRA_CA_CERTS=${NODE_EXTRA_CA_CERTS:-../nearpay-deploy/.secrets/tls/ca.pem} tsx demo/checkout.ts",
     "demo:agent": "NODE_EXTRA_CA_CERTS=${NODE_EXTRA_CA_CERTS:-../nearpay-deploy/.secrets/tls/ca.pem} tsx demo/agent.ts",
-    "ops": "tsx ops/cli.ts"
+    "ops": "tsx ops/cli.ts",
+    "onboard:live": "tsx scripts/onboard-live.ts"
   },
   "dependencies": {
     "@nearpay/agent-signer": "0.1.1",
