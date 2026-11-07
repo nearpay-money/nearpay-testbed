@@ -1,27 +1,14 @@
-import { createHash, X509Certificate } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
+import { chromeExecutable, localCertArgs } from "./lib/chrome.js";
 
 // Browser downloads are blocked here: use the system Chrome (brief; CI images ship Chrome too).
 const chrome = {
   channel: "chrome" as const,
-  launchOptions: { executablePath: process.env.NP_CHROME ?? "/usr/bin/google-chrome" },
+  launchOptions: { executablePath: chromeExecutable() },
 };
 const stack = process.env.NP_E2E === "1";
 
-/**
- * Chrome refuses WebAuthn on pages with certificate errors, and `ignoreHTTPSErrors` only hides the
- * error. Pinning the local leaf's SPKI makes Chrome treat nearpay-deploy's certificate as valid, so
- * passkeys work without installing the local CA (a no-op where mkcert's CA is already trusted).
- */
-function localCertArgs(): string[] {
-  const cert = join(resolve(process.env.NP_DEPLOY_DIR ?? "../nearpay-deploy"), ".secrets/tls/cert.pem");
-  if (!existsSync(cert)) return [];
-  const spki = new X509Certificate(readFileSync(cert)).publicKey.export({ type: "spki", format: "der" });
-  return [`--ignore-certificate-errors-spki-list=${createHash("sha256").update(spki).digest("base64")}`];
-}
-
+// Chrome refuses WebAuthn on certificate errors: lib/chrome.ts pins the local leaf's SPKI.
 export default defineConfig({
   workers: 1,
   reporter: [["list"]],
