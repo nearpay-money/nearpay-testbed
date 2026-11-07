@@ -30,6 +30,7 @@ nearpay-testbed/
 ├── merchant-demo/      demo merchant (own package + Dockerfile; image nearpay/merchant-demo:local) — see its README
 ├── demo/               checkout.ts (pnpm demo:checkout, demo steps 2–4), agent.ts (pnpm demo:agent, step 5)
 ├── ops/                Stage 1 ops CLI (pnpm ops …): KYB decision, kill switch, cool-off skip → docker compose exec
+├── scripts/            onboard-live.ts (pnpm onboard:live): live demo merchant onboarding in Chrome (step 1.5)
 ├── lib/                spec-route HTTP client, stack locations, merchant-demo client, scripted payers, scenarios 00–07
 ├── e2e/                full-stack suites for step 1.4: api/ (T1, T2/T6, T7, scenarios), agent/ (T4, T5), checkout/ (T3, hosted UI)
 ├── test/               unit + mock-backed tests (mock stack: spec-validated fake API, sentinel test key, webhooks)
@@ -117,18 +118,18 @@ NearPay holds a payer's or a merchant's keys.
 
 **1. What the owner provides**
 
-| Item | Where it goes | Used for |
-|---|---|---|
-| Treasury NEAR account (receives fees) | `NP_TREASURY_ACCOUNT` in `nearpay-deploy/compose/env/local.env` | fee destination in every requirement and quote |
-| Relayer NEAR account with ~1 NEAR for gas | `NP_RELAYER_ACCOUNT` (same file) | submits agents' signed intents to `intents.near` |
-| 4 function-call access keys of the relayer on `intents.near` | `nearpay-deploy/.secrets/live/relayer_key_1` … `relayer_key_4` (near-cli JSON or `ed25519:…`) | agentpay batcher; one key per in-flight batch |
-| NEAR RPC endpoints (your own key preferred) | `NP_NEAR_RPC_URLS` (comma-separated) | rails, agentpay, the agent's nonce salt |
-| Base / Arbitrum RPC endpoints | `NP_EVM_RPC_URLS_8453`, `NP_EVM_RPC_URLS_42161` | deposit watchers and receipt verification |
-| 1Click API key (optional) | `.secrets/live/oneclick_api_key` | quotes without 1Click's unauthenticated fee |
-| NEAR Intents Explorer token (optional) | `.secrets/live/explorer_token` and `NP_EXPLORER_ENABLED=true` | faster provider status |
-| Merchant NEAR account + wallet (e.g. via NEAR Connect) | signed in the dashboard | destination attestation (NEP-413) |
-| Payer EVM wallet with ~3 USDC on Base (or Arbitrum) + a little ETH for gas | the payer's browser | demo step 3 |
-| Agent NEAR account with ~1 USDC in its NEAR Intents balance | `NP_AGENT_SECRET_KEY` (or `_FILE`) and `NP_AGENT_ACCOUNT` (default: the key's implicit account) | demo step 5 |
+| Item                                                                                                  | Where it goes                                                                                        | Used for                                                |
+| ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Treasury NEAR account (receives fees)                                                                 | `NP_TREASURY_ACCOUNT` in `nearpay-deploy/compose/env/local.env`                                      | fee destination in every requirement and quote          |
+| Relayer NEAR account with ~1 NEAR for gas                                                             | `NP_RELAYER_ACCOUNT` (same file)                                                                     | submits agents' signed intents to `intents.near`        |
+| 4 function-call access keys of the relayer on `intents.near`                                          | `nearpay-deploy/.secrets/live/relayer_key_1` … `relayer_key_4` (near-cli JSON or `ed25519:…`)        | agentpay batcher; one key per in-flight batch           |
+| NEAR RPC endpoints (your own key preferred)                                                           | `NP_NEAR_RPC_URLS` (comma-separated)                                                                 | rails, agentpay, the agent's nonce salt                 |
+| Base / Arbitrum RPC endpoints                                                                         | `NP_EVM_RPC_URLS_8453`, `NP_EVM_RPC_URLS_42161`                                                      | deposit watchers and receipt verification               |
+| 1Click API key (optional)                                                                             | `.secrets/live/oneclick_api_key`                                                                     | quotes without 1Click's unauthenticated fee             |
+| NEAR Intents Explorer token (optional)                                                                | `.secrets/live/explorer_token` and `NP_EXPLORER_ENABLED=true`                                        | faster provider status                                  |
+| Merchant NEAR account: an implicit account's key (near-cli JSON), or a wallet (e.g. via NEAR Connect) | `nearpay-deploy/.secrets/accounts/merchant.json` for `pnpm onboard:live`, or signed in the dashboard | destination attestation (NEP-413); receives the payouts |
+| Payer EVM wallet with ~3 USDC on Base (or Arbitrum) + a little ETH for gas                            | the payer's browser                                                                                  | demo step 3                                             |
+| Agent NEAR account with ~1 USDC in its NEAR Intents balance                                           | `NP_AGENT_SECRET_KEY` (or `_FILE`) and `NP_AGENT_ACCOUNT` (default: the key's implicit account)      | demo step 5                                             |
 
 Fund the agent by depositing USDC (`nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1`)
 into `intents.near` for that account, for example via near-intents.org or `ft_transfer_call` to `intents.near`.
@@ -147,10 +148,34 @@ A public deployment needs real Turnstile keys and `NP_ENV=server` (Stage 5).
 
 **3. Demo script**
 
-1. **Merchant goes live.**
+1. **Merchant goes live.** One command does the whole step:
+
+   ```sh
+   pnpm onboard:live              # add --headed to watch Chrome; --help lists the options
+   ```
+
+   It needs the merchant's payout key at `../nearpay-deploy/.secrets/accounts/merchant.json` (near-cli JSON
+   `{account_id, public_key, private_key}` of an **implicit** account; `--merchant-key` to override), Docker
+   (for the ops CLI) and Chrome. Without a human step it:
+   - signs up `demo-merchant@nearpay.localhost` (`--email`) as "NearPay Demo Store" (`--business`): magic link
+     from Mailpit, then a passkey in Chrome's virtual authenticator. The passkey, private key included, is saved
+     to `.secrets/accounts/merchant-passkey.json` (0600); later runs sign in with it;
+   - adds a live USDC NEAR Intents destination for the key's account and signs the NEP-413 attestation with
+     that key, so payouts go to it; then skips the cool-off and approves KYB through the ops CLI;
+   - creates a live secret key and writes it to `.secrets/merchant-demo/secret_key`;
+   - adds a live webhook endpoint `http://merchant-demo:3000/webhooks` for all events, and appends its signing
+     secret to `.secrets/merchant-demo/webhook_secret`, keeping the existing entries.
+
+   The summary at the end lists the account, the destination and its fingerprint, the key prefix and the
+   endpoint. Secrets are never printed. The command is safe to re-run: it continues from wherever the last
+   run stopped, and when everything is in place it only checks. The ids it created are kept in
+   `.secrets/accounts/merchant-onboard.json`.
+
+   **Manual alternative:**
    - Sign up at `https://dashboard.nearpay.localhost` (magic link from Mailpit at `https://mail.nearpay.localhost`, then a passkey).
    - Add a USDC **NEAR Intents account** destination with your merchant NEAR account, and sign the attestation with your NEAR wallet.
    - Then run, from this repo:
+
      ```sh
      pnpm ops destination-cooloff-skip sd_…                       # or wait NP_COOLOFF_SECONDS
      pnpm ops kyb-decide acct_… approved --reason "demo merchant"
@@ -163,12 +188,15 @@ A public deployment needs real Turnstile keys and `NP_ENV=server` (Stage 5).
 3. **Payer pays.** Open the URL. Check the sentinel-verified merchant name and destination fingerprint. Connect the EVM wallet, choose USDC on Base, and pay.
 4. **Settlement.** Within about 1–2 minutes the merchant's Intents balance shows 2.00 USDC. `demo:checkout` prints `payment_intent.succeeded`, verified by merchant-demo. The dashboard payment page links the on-chain evidence.
 5. **Agent payment.** Run:
+
    ```sh
    NP_AGENT_SECRET_KEY_FILE=… NP_AGENT_ACCOUNT=… pnpm demo:agent --live
    ```
+
    The agent gets `402`, signs a NEAR Intents transfer, and receives the resource with `PAYMENT-RESPONSE` in about 2 s. merchant-demo receives `agent_payment.settled`. The price is 0.01 USDC, paid to the merchant's active Intents-account destination for its asset.
 
 **Safety.**
+
 - Live keys and `.secrets/` never leave your machine and are never committed.
 - `pnpm ops kill-switch` pauses rails and agentpay at once if anything looks wrong.
 - Stop with `scripts/down.sh` in nearpay-deploy.
