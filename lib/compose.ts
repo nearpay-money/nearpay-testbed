@@ -46,17 +46,30 @@ export interface RunResult {
   stderr: string;
 }
 
-export type Runner = (cmd: string, args: readonly string[]) => RunResult;
+export type Runner = (cmd: string, args: readonly string[], input?: string) => RunResult;
 
-export const dockerRunner: Runner = (cmd, args) => {
-  const r = spawnSync(cmd, args as string[], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 });
+export const dockerRunner: Runner = (cmd, args, input) => {
+  const r = spawnSync(cmd, args as string[], {
+    encoding: "utf8",
+    maxBuffer: 16 * 1024 * 1024,
+    ...(input !== undefined ? { input } : {}),
+  });
   if (r.error) return { code: 127, stdout: "", stderr: `${cmd}: ${r.error.message}` };
   return { code: r.status ?? 1, stdout: r.stdout, stderr: r.stderr };
 };
 
-/** Runs `ops.js` in `service`; parses stdout as JSON when it is JSON. */
-export function serviceOps(t: ComposeTarget, service: string, argv: readonly string[], run: Runner = dockerRunner) {
-  const r = run("docker", composeExecArgs(t, service, argv));
+/** Runs `ops.js` in `service` (optional stdin); parses stdout as JSON when it is JSON. */
+export function serviceOps(
+  t: ComposeTarget,
+  service: string,
+  argv: readonly string[],
+  run: Runner = dockerRunner,
+  input?: string,
+) {
+  const r =
+    input === undefined
+      ? run("docker", composeExecArgs(t, service, argv))
+      : run("docker", composeExecArgs(t, service, argv), input);
   let json: unknown;
   try {
     json = r.stdout.trim() ? JSON.parse(r.stdout) : undefined;

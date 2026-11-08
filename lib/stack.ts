@@ -5,6 +5,7 @@
  * |---|---|
  * | `NP_BASE_DOMAIN` | `nearpay.localhost` (+ `NP_HTTPS_PORT` if not 443) |
  * | `NP_API_URL`, `NP_PAY_URL`, `NP_DASHBOARD_URL`, `NP_MERCHANT_DEMO_URL` | `https://api.<domain>` … |
+ * | `NP_OPS_URL` (console host), `NP_MAIL_URL` (Mailpit) | `https://ops.<domain>`, `https://mail.<domain>` |
  * | `NP_PAYER_API_URL` | `<pay URL>/api` (the checkout reaches the API same-origin, platform §1) |
  * | `NP_DEPLOY_DIR` | `../nearpay-deploy` (secrets, compose files) |
  * | `NP_SECRET_KEY` | `<deploy>/.secrets/merchant-demo/secret_key` (written by `seed.sh data`) |
@@ -25,6 +26,10 @@ export interface Stack {
   payerApiUrl: string;
   dashboardUrl: string;
   merchantDemoUrl: string;
+  /** Console host (`ops.<domain>`; its API is `<opsUrl>/api/ops/*`). */
+  opsUrl: string;
+  /** Mailpit (local stack). */
+  mailUrl: string;
   deployDir: string;
   secretKey(): string | null;
   pinnedKeys(): PinnedSentinelKey[];
@@ -45,6 +50,8 @@ export function stackFromEnv(env: Env = process.env, cwd: string = process.cwd()
     payerApiUrl: env.NP_PAYER_API_URL ?? `${env.NP_PAY_URL ?? site("pay")}/api`,
     dashboardUrl: env.NP_DASHBOARD_URL ?? site("dashboard"),
     merchantDemoUrl: env.NP_MERCHANT_DEMO_URL ?? site("merchant-demo"),
+    opsUrl: env.NP_OPS_URL ?? site("ops"),
+    mailUrl: env.NP_MAIL_URL ?? site("mail"),
     deployDir,
     secretKey: () => env.NP_SECRET_KEY ?? readFile(join(deployDir, ".secrets/merchant-demo/secret_key")),
     pinnedKeys: () => {

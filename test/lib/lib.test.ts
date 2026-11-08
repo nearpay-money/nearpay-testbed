@@ -119,6 +119,8 @@ describe("stack", () => {
       apiUrl: "https://api.nearpay.localhost",
       payerApiUrl: "https://pay.nearpay.localhost/api",
       merchantDemoUrl: "https://merchant-demo.nearpay.localhost",
+      opsUrl: "https://ops.nearpay.localhost",
+      mailUrl: "https://mail.nearpay.localhost",
       deployDir: "/ws/nearpay-deploy",
     });
     expect(s.secretKey()).toBeNull();

@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- SYNTHETIC OFAC SDN advanced-XML document for offline local stacks (testbed E2E): the real list's shape
+     (FeatureTypeValues + DistinctParty features) with one made-up address. Not OFAC data. Containers on a
+     machine without internet cannot download the list (NP_SANCTIONS_REFRESH), and compliance answers live
+     screening with screening_unavailable until a list was loaded once. -->
+<Sanctions xmlns="https://sanctionslistservice.ofac.treas.gov/api/PublicationPreview/exports/ADVANCED_XML" Version="3">
+<ReferenceValueSets>
+<FeatureTypeValues>
+      <FeatureType ID="345" FeatureTypeGroupID="1">Digital Currency Address - ETH</FeatureType>
+</FeatureTypeValues>
+</ReferenceValueSets>
+<DistinctParties>
+  <DistinctParty FixedRef="0">
+    <Profile ID="0" PartySubTypeID="4">
+      <Feature ID="0" FeatureTypeID="345">
+        <FeatureVersion ID="0" ReliabilityID="1">
+          <VersionDetail DetailTypeID="1432">0x00000000000000000000000000000000000bad01</VersionDetail>
+        </FeatureVersion>
+      </Feature>
+    </Profile>
+  </DistinctParty>
+</DistinctParties>
+</Sanctions>
