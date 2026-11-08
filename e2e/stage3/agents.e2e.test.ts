@@ -162,11 +162,13 @@ describe.skipIf(!realStack)("Stage 3 · agents (x402 near-intents, MCP)", () => 
     const plain = await fetch(`${merchant.url}/premium`);
     expect(plain.status).toBe(402);
     const required = x402.parsePaymentRequired(plain.headers.get("payment-required"));
-    expect(
-      required.accepts.some(
-        (a: { extra: { assetTransferMethod?: string } }) => a.extra.assetTransferMethod === "near-intents",
-      ),
-    ).toBe(true);
+    // near-intents entries are parsed apart from intents-transfer ones (this route offers cross-chain only)
+    expect(required.accepts).toEqual([]);
+    expect(required.nearIntents.length).toBeGreaterThan(0);
+    expect(required.nearIntents[0].extra).toMatchObject({
+      assetTransferMethod: "near-intents",
+      originAssetId: USDC_BASE,
+    });
 
     const res = await pay(`${merchant.url}/premium`);
     const body = await res.text();
@@ -182,8 +184,11 @@ describe.skipIf(!realStack)("Stage 3 · agents (x402 near-intents, MCP)", () => 
       status: "settled",
       transfer_method: "near-intents",
       pay_to: payTo,
-      amount: "10000",
     });
+    // rails tags route amounts for attribution (lld/rails.md §20: the merchant may receive amount + tag, sub-cent);
+    // agentpay reports the settled amount, never less than the price
+    expect(BigInt(ap.amount)).toBeGreaterThanOrEqual(10000n);
+    expect(BigInt(ap.amount) - 10000n).toBeLessThan(10000n);
     expect(ap.tx_hash).toBeTruthy();
     await md().waitForEvent({ type: "agent_payment.settled", object: apId }, WEBHOOK_TIMEOUT_MS);
     expect(events.at(-1)).toMatchObject({ method: "near-intents" });

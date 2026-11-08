@@ -3,7 +3,7 @@
  * and paid"; billing §13 test clock, spec 0.3.1 `advanceSubscriptionClock`): create on a monthly price → first
  * invoice issued at once (subscription `incomplete`) → paid → `active` → clock to `renewal_upcoming` (event + mail) →
  * clock to `renewal` (renewal invoice created, finalized, sent; mail) → paid from Solana → still `active`, period
- * moved → next renewal left unpaid → clock to `overdue` (`invoice.overdue`, `past_due`, overdue reminder mail) →
+ * moved → next renewal left unpaid → clock to `overdue` (`invoice.overdue`, `past_due`, dunning reminder mails) →
  * paid late → `active` again. Every step is checked on the merchant-demo webhooks (signature-verified).
  */
 import { advanceSubscriptionClock, getSubscription, listInvoices } from "@nearpay/spec";
@@ -106,7 +106,10 @@ describe.skipIf(!realStack)("Stage 3 · subscriptions", () => {
     await webhook("invoice.overdue", unpaid.id);
     await subUntil(sub.id, (s) => s.status === "past_due", "past_due");
     await webhook("customer.subscription.updated", sub.id, (o) => o.status === "past_due");
-    await customerMail(cat.email, new RegExp(`^Overdue: invoice ${unpaid.number} from `), t3);
+    // dunning on the subscription clock: the reminder 3 days before the due date, then "due today" at the due date
+    // (the "Overdue:" reminders follow later per reminder_days; the overdue target stops at the due date)
+    await customerMail(cat.email, new RegExp(`^Reminder: invoice ${unpaid.number} from .* is due in 3 days`), t3);
+    await customerMail(cat.email, new RegExp(`^Invoice ${unpaid.number} from .* is due today`), t3);
 
     // paying the overdue invoice reactivates the subscription
     await payInvoice(unpaid.hosted_invoice_url as string);
