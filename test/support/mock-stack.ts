@@ -261,6 +261,7 @@ export async function startMockStack(o: { payUrl?: string } = {}): Promise<MockS
     object: "checkout_session",
     livemode: false,
     status: s.status,
+    payment_intent: s.intentId, // spec 0.2.0
     intent_status: s.intentStatus,
     amount: s.amount,
     currency: "usd",

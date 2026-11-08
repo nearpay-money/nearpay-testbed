@@ -6,6 +6,7 @@
  * no RPC) → cool-off (Stage 1 ops CLI skip; local.env keeps 24 h) → `activated` (security email) →
  * KYB submitted from Home → ops CLI KYB decision → account live.
  */
+import "../../lib/localhost-dns.js";
 import { randomBytes } from "node:crypto";
 import { nep413Hash } from "@nearpay/agent-signer";
 import { ed25519 } from "@noble/curves/ed25519.js";
@@ -40,16 +41,17 @@ const mailUrl = st.dashboardUrl.replace("://dashboard.", "://mail.");
 const ops = (service: string, argv: string[]) => serviceOps({ deployDir: st.deployDir }, service, argv);
 
 /** Newest Mailpit message to `to` whose subject matches, as plain text. */
-async function mail(page: Page, to: string, subject: RegExp): Promise<{ subject: string; text: string }> {
+async function mail(_page: Page, to: string, subject: RegExp): Promise<{ subject: string; text: string }> {
   let found: { subject: string; text: string } | undefined;
   await expect
     .poll(
       async () => {
-        const r = await page.request.get(`${mailUrl}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
+        // Node fetch (with the *.localhost shim): Playwright's request context resolves names itself
+        const r = await fetch(`${mailUrl}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
         const list = (await r.json()) as { messages: { ID: string; Subject: string }[] };
         const m = list.messages.find((x) => subject.test(x.Subject));
         if (!m) return false;
-        const full = (await (await page.request.get(`${mailUrl}/api/v1/message/${m.ID}`)).json()) as { Text: string };
+        const full = (await (await fetch(`${mailUrl}/api/v1/message/${m.ID}`)).json()) as { Text: string };
         found = { subject: m.Subject, text: full.Text };
         return true;
       },
@@ -166,15 +168,17 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
   const account = /"(acct_[0-9a-z]{26})"/.exec(JSON.stringify(shown.json))?.[1] as string;
   expect(account).toBeTruthy();
 
-  // live destination: NEP-413 challenge signed by the destination account's key
-  await page.getByRole("button", { name: "Live" }).click();
+  // live destination: NEP-413 challenge signed by the destination account's key (Stage 2 dashboard: mode switch,
+  // "Add a destination" form, wallet verification in one step)
+  await page.getByRole("switch", { name: "Live mode" }).click();
   await expect(page).toHaveURL(/mode=live/);
-  await page.getByRole("link", { name: "Settlement" }).click();
-  await page.getByRole("link", { name: "Add destination" }).click();
-  await page.getByLabel("Asset").selectOption(USDC_NEAR);
-  await page.getByLabel("Intents account").fill(near.accountId);
-  await page.getByLabel("Label").fill("Live USDC (T1)");
-  await page.getByRole("button", { name: "Add destination" }).click();
+  await page.goto(`${st.dashboardUrl}/settlement/new?mode=live`);
+  await expect(page.getByRole("heading", { name: "Add a destination" })).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel("Currency").selectOption("USDC");
+  await page.getByLabel("Network", { exact: true }).selectOption(USDC_NEAR);
+  await page.getByLabel("NEAR Intents account", { exact: true }).fill(near.accountId);
+  await page.getByLabel("Destination name").fill("Live USDC (T1)");
+  await page.getByRole("button", { name: "Connect wallet & verify" }).click();
   const stepUp = page.getByRole("dialog", { name: "Confirm it's you" });
   const challenge = page.getByTestId("challenge-message");
   await expect(stepUp.or(challenge)).toBeVisible({ timeout: 30_000 });
@@ -191,7 +195,7 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
 
   // cooling off (24 h in local.env) → the Stage 1 ops CLI skip → activated
   await page.getByRole("link", { name: "Back to destinations" }).click();
-  await expect(page.getByTestId("cooloff")).toContainText("active in");
+  await expect(page.getByTestId("cooloff")).toContainText(/activates in/i);
   const destinations = ops("identity-api", ["account-show", account]);
   const sd = new RegExp(`"(sd_[0-9a-z]{26})"[^}]*${near.accountId}|${near.accountId}[^}]*"(sd_[0-9a-z]{26})"`).exec(
     JSON.stringify(destinations.json),
@@ -211,10 +215,27 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
   await expect(page.getByTestId("destinations-table")).toContainText(fingerprint);
   await mail(page, email, /destination/i); // notify's security email on activation
 
-  // KYB from Home, then the manual ops decision (compliance) → identity live_enabled
-  await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Home" }).click();
-  await page.getByRole("button", { name: "Start verification" }).click();
-  await expect(page.getByTestId("requirements")).toContainText("pending");
+  // self-declared business details (Settings → Business details, ADR-0020 d3) → the ops decision (Stage 1 CLI;
+  // the console path is e2e/stage2/console.e2e.test.ts) → identity live_enabled
+  await page.goto(`${st.dashboardUrl}/settings/business`);
+  await page.getByLabel("Registered legal name").fill(`${business} GmbH`);
+  await page.getByLabel("Country of incorporation").selectOption("DE");
+  await page.getByLabel("Business type").selectOption("company");
+  await page.getByLabel("Registration number").fill("HRB 1234");
+  await page.getByLabel("Expected monthly volume").selectOption("under_10k");
+  await page.getByLabel("Street address").fill("Teststr. 1");
+  await page.getByLabel("City").fill("Berlin");
+  await page.getByLabel("Postal code").fill("10115");
+  await page.getByLabel(/^Country(?! of)/).selectOption("DE");
+  await page.getByLabel("Full name").fill("Erika Mustermann");
+  await page.getByLabel("Role").fill("Director");
+  await page.getByTestId("kyb-declaration").check();
+  await page.getByTestId("kyb-submit").click();
+  if (await stepUp.isVisible({ timeout: 5_000 }).catch(() => false))
+    await page.getByRole("button", { name: "Confirm with passkey" }).click();
+  await expect
+    .poll(() => JSON.stringify(ops("compliance-api", ["kyb-show", account]).json), { timeout: 30_000 })
+    .toMatch(/"status":\s*"pending"/);
   expect(
     runCli(["kyb-decide", account, "approved", "--reason", "testbed T1"], { deployDir: st.deployDir, out: () => {} }),
   ).toBe(0);

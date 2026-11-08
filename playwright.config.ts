@@ -1,3 +1,4 @@
+import "./lib/localhost-dns.js"; // *.localhost → loopback for Node-side requests (Mailpit, APIs) in Playwright
 import { defineConfig } from "@playwright/test";
 import { chromeExecutable, localCertArgs } from "./lib/chrome.js";
 
