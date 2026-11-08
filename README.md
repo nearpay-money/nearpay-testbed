@@ -66,7 +66,18 @@ Live mode (step 1.5): `demo:checkout` prints the hosted checkout URL for a human
 needs USDC there before `demo:agent`, T3, T4 and T5. There is no public route for it: `seed.sh data`
 (or a sandbox ops command) must fund it — see the step 1.3 report.
 
-## Ops (Stage 1, local only)
+## Ops (local only)
+
+Operators work in the console (`https://ops.nearpay.localhost`); add one with a role (`ops` or `ops_admin`, enforced
+per console route since kit 0.2.0) and open the enrolment link from Mailpit:
+
+```sh
+pnpm ops operator-add ops@example.test ops_admin
+pnpm ops operator-revoke ops@example.test
+pnpm ops sanctions-import                      # offline stacks: loads the synthetic OFAC list (fixtures/ofac)
+```
+
+Stage 1 commands (drills, local stacks):
 
 ```sh
 pnpm ops kyb-decide acct_… approved --reason "documents checked"
@@ -84,7 +95,7 @@ Against nearpay-deploy's stack (`scripts/up.sh` with the `merchant-demo` profile
 
 ```sh
 export NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem    # set it explicitly; trusts the local CA
-pnpm test:e2e                       # T2–T7 + scenarios 00/03/04/05/06 (~3 min)
+pnpm test:e2e                       # T2–T7 + scenarios 00/03/04/05/06 + Stage 2 (e2e/stage2) (~5 min)
 NP_E2E_SLOW=1 pnpm test:e2e         # + 01, 02, 07 side by side (~35 min: 02 waits for the 30 min quote deadline)
 NP_E2E=1 pnpm test:pw               # Chrome: hosted checkout (T2/T6 UI) and dashboard onboarding (T1)
 NP_E2E=mock pnpm exec vitest run --project e2e                      # suite logic against the mock stack
@@ -98,6 +109,10 @@ NP_E2E=mock pnpm exec vitest run --project e2e                      # suite logi
 | `e2e/api/onboarding`                  | T1 ops half: the seeded merchant is visible to ops                                                                                                                                                                                 |
 | `e2e/checkout/intents`, `e2e/agent/*` | T3 (Intents balance, NEP-413), T4 (x402 `/premium`), T5 (agent pays a session)                                                                                                                                                     |
 | `e2e/checkout/hosted.pw.ts`           | the hosted checkout in Chrome: manual path, verified merchant + fingerprint, address after network confirmation, simulate, redirect, webhook                                                                                       |
+| `e2e/stage2/refunds`                  | route refund to the payer's origin chain (test-mode signing path) → `succeeded` + evidence, signed `refund.succeeded`, receipt in Mailpit; merchant-signed Intents refund relayed by agentpay                                     |
+| `e2e/stage2/payment-links`            | link paid from Base while settling on NEAR: session complete, `uses` + 1, `payment_intent.succeeded`, hosted `/l/` never framed                                                                                                    |
+| `e2e/stage2/reconciliation`           | console re-run of a completed day → `ok`, `diff_count 0`; evidence unavailable → `error` run → `reconciliation_diff` compliance case (stops and restarts `rails-api`)                                                           |
+| `e2e/stage2/console`                  | two-person kill-switch release (requester and `ops` role refused); self-declared KYB → console approval (step-up) → live                                                                                                          |
 | `e2e/dashboard/onboarding.pw.ts`      | T1 in Chrome: sign-up → magic link (Mailpit) → passkey (CDP virtual authenticator) → live NEAR Intents destination signed with NEP-413 by a fresh implicit account → cool-off skip (ops CLI) → KYB → ops decision → `live_enabled` |
 
 Scenario outcomes (domain-model §4–§5): 00 succeeded; 01 processing then succeeded; 02 attempt refunded at the
