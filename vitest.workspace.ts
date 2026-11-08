@@ -21,6 +21,8 @@ export default defineWorkspace([
       pool: "forks",
       poolOptions: { forks: { singleFork: true } },
       globalSetup: ["e2e/support/global-setup.ts"],
+      // *.localhost → loopback in the test workers (glibc does not resolve these names; RFC 6761)
+      setupFiles: ["lib/localhost-dns.ts"],
     },
   },
 ]);

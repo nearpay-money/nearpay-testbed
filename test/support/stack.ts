@@ -10,6 +10,8 @@ export function mockStackConfig(stack: MockStack, merchantDemoUrl: string): Stac
     payerApiUrl: stack.url,
     dashboardUrl: `${stack.url}/dashboard`,
     merchantDemoUrl,
+    opsUrl: `${stack.url}/ops`,
+    mailUrl: `${stack.url}/mail`,
     deployDir: "/nonexistent",
     secretKey: () => SECRET_KEY,
     pinnedKeys: () => [SENTINEL_KEY],
