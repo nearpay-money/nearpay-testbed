@@ -165,7 +165,7 @@ describe("artifacts", () => {
   });
 
   it("finds installed packages and falls back to repository build output", async () => {
-    expect(installedVersion("@nearpay/spec")).toMatch(/^0\.3\./);
+    expect(installedVersion("@nearpay/spec")).toMatch(/^0\.4\./);
     expect(installedVersion("@nearpay/does-not-exist")).toBeNull();
     const repos = mkdtempSync(join(tmpdir(), "np-repos-"));
     expect(reposDir({ NP_REPOS_DIR: repos })).toBe(repos);
