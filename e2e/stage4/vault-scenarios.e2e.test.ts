@@ -14,7 +14,7 @@
  *   (`floor(share / 2)`), `fee: "0"`: the invoice is not paid but voided with the collection recorded, and a
  *   `send_invoice` balance invoice for the shortfall is sent.
  */
-import { listInvoices } from "@nearpay/spec";
+import { listInvoices, prepareMandate } from "@nearpay/spec";
 import { beforeAll, describe, expect, it } from "vitest";
 import { md as demo, realStack, slow } from "../support/env.js";
 import { api, until } from "../support/stage2.js";
@@ -42,12 +42,17 @@ const invoicesOf = (sub: string) =>
 /** Asset-priced `auto_debit` subscription for `amount`, funded with `periods` periods; returns the linked mandate. */
 async function funded(tag: string, amount: string, periods = 3) {
   const s = await autoDebitSubscription(tag, { assetAmount: amount });
+  // the keeper collects period 1 within about a second of the funding, so the receiver's balance is read before it
+  const { merchant_receiver } = await api<{ merchant_receiver: string }>(prepareMandate, {
+    body: { subscription: s.sub.id, periods },
+  });
+  const receiverBefore = intentsBalance(merchant_receiver);
   const f = await fundMandate(s.sub.id, periods);
   expect(f).toMatchObject({ accepted: true });
   const md = await mandateFor(s.sub.id);
   expect(md).toMatchObject({ link_status: "linked", amount_per_period: amount, asset_id: USDC_NEAR });
   await webhook("mandate.activated", md.id);
-  return { ...s, md, first: s.sub.latest_invoice as string, total: BigInt(amount) * BigInt(periods) };
+  return { ...s, md, receiverBefore, first: s.sub.latest_invoice as string, total: BigInt(amount) * BigInt(periods) };
 }
 
 describe.skipIf(!realStack)("Stage 4 · vault stand-in scenarios 91–94", () => {
@@ -127,9 +132,8 @@ describe.skipIf(!realStack)("Stage 4 · vault stand-in scenarios 91–94", () =>
 
   it("94 partial delivery → short share: invoice voided with the collection, balance invoice sent", async () => {
     const amount = "10000094";
-    const { md, first, total, sub, email } = await funded("vault-94", amount);
+    const { md, first, total, sub, email, receiverBefore } = await funded("vault-94", amount);
     expect(md.receiver_kind).toBe("intents_account");
-    const receiverBefore = intentsBalance(md.merchant_receiver);
     const short = expectedShare(amount, md.fee_bps) / 2n;
     const t = Date.now() - 2000;
     const c: Mandate = await mandateUntil(md.id, (m) => m.collected_periods === 1, "period 1 collected", COLLECT_MS);

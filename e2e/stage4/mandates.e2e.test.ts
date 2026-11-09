@@ -135,6 +135,8 @@ describe.skipIf(!realStack)("Stage 4 · auto-debit (sandbox vault stand-in)", ()
         receiver_kind: "intents_account",
         amount_per_period: "10000000",
         period_secs: MONTH_SECS,
+        start_at: null, // serde Option fields are explicit nulls (spec test-vectors/vault.json)
+        max_periods: null,
         fee_bps: prep.fee_bps,
         ext_ref: sub.id,
       },

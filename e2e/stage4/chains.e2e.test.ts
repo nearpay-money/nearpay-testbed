@@ -43,9 +43,10 @@ async function payFrom(
   origin: string,
   refundTo: string,
   check: (a: AttestedAttempt) => void,
+  expiresIn?: number,
 ): Promise<{ attempt: OrderAttempt; attested: AttestedAttempt }> {
   const demo = md();
-  const s = await demo.checkout();
+  const s = await demo.checkout(undefined, expiresIn);
   const c = payer(s.url as string, sessionFromUrl);
   const attested = await attestedAttempt(c, { method: "route_quote", originAssetId: origin, refundTo });
   check(attested);
@@ -104,15 +105,23 @@ describe.skipIf(!realStack)("Stage 4 · Solana and Bitcoin payers", () => {
   });
 
   it("Bitcoin manual path: P2WPKH deposit, no memo, BIP-21 amount → paid", async () => {
-    const { attempt, attested } = await payFrom(BTC, TEST_REFUND_BITCOIN, (a) => {
-      const d = a.attestation.deposit;
-      expect(d).toMatchObject({ chain: BITCOIN_MAINNET, memo: null, origin_asset_id: BTC });
-      expect(d?.address).toMatch(/^bc1q[02-9ac-hj-np-z]{38}$/);
-      expect(a.attestation.asset).toMatchObject({ asset_id: BTC, decimals: 8 });
-      const uri = bip21Uri(d?.address as string, d?.amount_in as string);
-      expect(uri).toBe(`bitcoin:${d?.address}?amount=${formatBaseUnits(d?.amount_in as string, 8)}`);
-      expect(BigInt(d?.amount_in as string)).toBeGreaterThan(0n);
-    });
+    // Bitcoin's chain profile needs >= 1 h before the deadline (rails chains.yaml min_deadline_s 3600): a default
+    // 1-hour session (account session_ttl_default) leaves less than that by the attempt, so it answers route_too_slow;
+    // this session gets 2 h (test-mode expires_in override).
+    const { attempt, attested } = await payFrom(
+      BTC,
+      TEST_REFUND_BITCOIN,
+      (a) => {
+        const d = a.attestation.deposit;
+        expect(d).toMatchObject({ chain: BITCOIN_MAINNET, memo: null, origin_asset_id: BTC });
+        expect(d?.address).toMatch(/^bc1q[02-9ac-hj-np-z]{38}$/);
+        expect(a.attestation.asset).toMatchObject({ asset_id: BTC, decimals: 8 });
+        const uri = bip21Uri(d?.address as string, d?.amount_in as string);
+        expect(uri).toBe(`bitcoin:${d?.address}?amount=${formatBaseUnits(d?.amount_in as string, 8)}`);
+        expect(BigInt(d?.amount_in as string)).toBeGreaterThan(0n);
+      },
+      7200,
+    );
     expect(attempt).toMatchObject({
       origin_asset_id: BTC,
       origin_chain: BITCOIN_MAINNET,
