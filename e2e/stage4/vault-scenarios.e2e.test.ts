@@ -62,6 +62,7 @@ describe.skipIf(!realStack)("Stage 4 · vault stand-in scenarios 91–94", () =>
 
   it("91 merchant leg fails → collect_failed, not counted, invoice unpaid (slow: fallback after 5)", async () => {
     const amount = "10000091";
+    const created = Date.now() - 2000; // the first invoice is emailed when the subscription is created
     const { md, first, total, email } = await funded("vault-91", amount);
     const failed = await mandateUntil(md.id, (m) => m.collect_failures >= 1, "collect_failed", COLLECT_MS);
     expect(failed).toMatchObject({
@@ -86,7 +87,10 @@ describe.skipIf(!realStack)("Stage 4 · vault stand-in scenarios 91–94", () =>
     )) as AutoDebitInvoice;
     expect((await getMd(md.id)).collect_failures).toBeGreaterThanOrEqual(5);
     await webhook("invoice.sent", fallback.id, undefined, 120_000);
-    await customerMail(email, new RegExp(`^Invoice ${fallback.number} from `), t);
+    // billing sends at most one mail per invoice per 10 minutes (lld/billing.md §5): five attempts ≥ 60 s apart
+    // usually fall back inside that window, so the customer's mail is the one from the invoice's creation
+    const mailedSince = Date.now() - created < 10 * 60_000 ? created : t;
+    await customerMail(email, new RegExp(`^Invoice ${fallback.number} from `), mailedSince);
     // collect failures are the merchant side's problem, not the payer's balance
     expect(await demo().events({ type: "mandate.insufficient_funds", object: md.id })).toEqual([]);
   });
