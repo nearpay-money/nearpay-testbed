@@ -53,8 +53,20 @@ async function paidSession(pay: (s: Session) => Promise<unknown>, customerEmail?
 }
 
 /** Creates the refund and waits for its prepared leg (`next_action`). */
-async function preparedRefund(pi: Intent, reason?: string): Promise<Refund> {
-  const created = await api<Refund>(createRefund, { body: { payment_intent: pi.id, ...(reason ? { reason } : {}) } });
+/**
+ * Route refund legs run the sandbox scenario of the refund amount's last two digits (sandbox §4), and the settled
+ * amount carries a varying amount tag: refunding all of it picked scenario 04 (`failed_after_deposit`, held) in a step
+ * 3.4 run. The largest amount ≤ the settled amount ending in `00` keeps the leg on scenario 00.
+ */
+const scenario00Amount = (settled: string) => {
+  const a = BigInt(settled);
+  return (a - (a % 100n)).toString();
+};
+
+async function preparedRefund(pi: Intent, reason?: string, amount?: string): Promise<Refund> {
+  const created = await api<Refund>(createRefund, {
+    body: { payment_intent: pi.id, ...(reason ? { reason } : {}), ...(amount ? { amount } : {}) },
+  });
   expect(created.status).toBe("requires_action");
   return until(
     () => api<Refund>(getRefund, { params: { id: created.id } }),
@@ -84,11 +96,12 @@ describe.skipIf(!realStack)("Stage 2 · refunds (test mode)", () => {
       (s) => payBySimulatedDeposit(payer(s.url, sessionFromUrl), { refundTo: TEST_REFUND_EVM }),
       customer,
     );
-    const re = await preparedRefund(pi, "requested_by_customer");
+    const amount = scenario00Amount(pi.amount_settled as string);
+    const re = await preparedRefund(pi, "requested_by_customer", amount);
     expect(re).toMatchObject({
       method: "route_quote",
       livemode: false,
-      amount: pi.amount_settled,
+      amount,
       recipient: { type: "origin_chain", chain: "eip155:8453", address: TEST_REFUND_EVM, overridden: false },
     });
     // the merchant's source is an Intents account: the live action would be a sign_intent from it

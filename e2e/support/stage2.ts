@@ -6,7 +6,7 @@
 import { randomUUID } from "node:crypto";
 import { listWebhookEndpoints, updateWebhookEndpoint } from "@nearpay/spec";
 import { call, type RouteCall } from "../../lib/http.js";
-import { enrolmentToken, mailpit, OpsConsole } from "../../lib/ops-console.js";
+import { enrolmentToken, mailpit, OpsConsole, opsRoute } from "../../lib/ops-console.js";
 import { ops, stack } from "./env.js";
 
 type Route = Parameters<typeof call>[0];
@@ -61,4 +61,52 @@ export async function until<T>(get: () => Promise<T>, done: (v: T) => boolean, t
     last = await get();
   }
   return last;
+}
+
+export interface ReconciliationRun {
+  id: string;
+  status: string;
+  diff_count: number;
+  day: string;
+  error: string | null;
+  rerun_of: string | null;
+}
+
+/** Runs the console reconciliation of `account`'s test-mode `day` and waits until it is no longer `running`. */
+export async function reconcile(op: OpsConsole, account: string, day: string): Promise<ReconciliationRun> {
+  const run = await op.call<ReconciliationRun>(opsRoute("createOpsReconciliationRun"), {
+    body: { account_id: account, livemode: false, day },
+  });
+  if (run.day !== day || run.status !== "running") throw new Error(`unexpected new run: ${JSON.stringify(run)}`);
+  return until(
+    () => op.call<ReconciliationRun>(opsRoute("getOpsReconciliationRun"), { params: { id: run.id } }),
+    (r) => r.status !== "running",
+    3 * 60_000,
+    `${run.id} completed`,
+  );
+}
+
+/** The refusal of a day whose rails evidence is not complete yet (payments §6.4; rails §5 "Expiry", §19.3). */
+export const EVIDENCE_NOT_COMPLETE = /^rails evidence for \d{4}-\d{2}-\d{2} is not complete \(/;
+
+/**
+ * Reconciles the newest completed UTC day whose evidence is complete. A day stays incomplete while executions
+ * created that day are still open — an unpaid quote keeps its 24 h late-settlement window (`expired_unpaid` with
+ * `tracking_until` ahead) — so on a stack that ran E2E yesterday, "yesterday" is refused with
+ * `EVIDENCE_NOT_COMPLETE` until those windows close; the run then steps back one day (at most `maxDaysBack`).
+ * Returns every run, newest day first; the last one is the decisive run.
+ */
+export async function reconcileLatestCompleteDay(
+  op: OpsConsole,
+  account: string,
+  maxDaysBack = 7,
+): Promise<ReconciliationRun[]> {
+  const runs: ReconciliationRun[] = [];
+  for (let back = 1; back <= maxDaysBack; back++) {
+    const day = new Date(Date.now() - back * 86_400_000).toISOString().slice(0, 10);
+    const run = await reconcile(op, account, day);
+    runs.push(run);
+    if (!(run.status === "error" && EVIDENCE_NOT_COMPLETE.test(run.error ?? ""))) return runs;
+  }
+  return runs;
 }

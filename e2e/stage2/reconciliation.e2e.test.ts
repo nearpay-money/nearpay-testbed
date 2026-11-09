@@ -5,6 +5,10 @@
  * stopped while a run executes, so the run cannot reconcile and ends `error` after its retries — which, like a
  * `diff`, opens a `reconciliation_diff` compliance case in the console queue.
  *
+ * "Last completed day" is the newest day before today whose rails evidence is complete: a day with unpaid quotes keeps
+ * open executions for their 24 h late-settlement window and is refused as not complete until then (step 3.4 finding),
+ * so the run steps back a day at a time (`reconcileLatestCompleteDay`).
+ *
  * Why not a `diff` with mismatching amounts: only completed UTC days can be reconciled (`reconciliation_day_open`
  * for today) and the testbed never writes service databases, so a fresh stack has no settled activity on a
  * completed day to disagree about. Set NP_E2E_RECON_DAY=<YYYY-MM-DD> to also reconcile a day with activity.
@@ -13,36 +17,20 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { OpsConsole } from "../../lib/ops-console.js";
 import { opsRoute } from "../../lib/ops-console.js";
 import { realStack, stack } from "../support/env.js";
-import { operator, until } from "../support/stage2.js";
-
-type Run = {
-  id: string;
-  status: string;
-  diff_count: number;
-  day: string;
-  error: string | null;
-  rerun_of: string | null;
-};
+import {
+  EVIDENCE_NOT_COMPLETE,
+  operator,
+  type ReconciliationRun as Run,
+  reconcile,
+  reconcileLatestCompleteDay,
+  until,
+} from "../support/stage2.js";
 
 const demoAccount = () =>
   (JSON.parse(readFileSync(join(stack().deployDir, ".secrets/demo.json"), "utf8")) as { account: string }).account;
 const yesterday = () => new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-
-async function reconcile(op: OpsConsole, account: string, day: string): Promise<Run> {
-  const run = await op.call<Run>(opsRoute("createOpsReconciliationRun"), {
-    body: { account_id: account, livemode: false, day },
-  });
-  expect(run).toMatchObject({ day, status: "running" });
-  return until(
-    () => op.call<Run>(opsRoute("getOpsReconciliationRun"), { params: { id: run.id } }),
-    (r) => r.status !== "running",
-    3 * 60_000,
-    `${run.id} completed`,
-  );
-}
 
 const compose = (args: string[]) => {
   const d = join(stack().deployDir, "compose");
@@ -53,8 +41,12 @@ describe.skipIf(!realStack)("Stage 2 · reconciliation (console)", () => {
   it("a completed day reconciles ok with no diffs; today is refused", async () => {
     const op = await operator("ops", "recon");
     const account = demoAccount();
-    for (const day of [yesterday(), ...(process.env.NP_E2E_RECON_DAY ? [process.env.NP_E2E_RECON_DAY] : [])]) {
-      const run = await reconcile(op, account, day);
+    const runs = await reconcileLatestCompleteDay(op, account);
+    for (const refused of runs.slice(0, -1)) expect(refused.error).toMatch(EVIDENCE_NOT_COMPLETE);
+    const last = runs.at(-1) as Run;
+    expect(last, JSON.stringify(last)).toMatchObject({ status: "ok", diff_count: 0, error: null });
+    if (process.env.NP_E2E_RECON_DAY) {
+      const run = await reconcile(op, account, process.env.NP_E2E_RECON_DAY);
       expect(run, JSON.stringify(run)).toMatchObject({ status: "ok", diff_count: 0, error: null });
     }
     await expect(
