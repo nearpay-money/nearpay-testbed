@@ -25,9 +25,15 @@ import { DEMO_AGENT_SEED_HEX, USDC } from "../../demo/agent.js";
 import { loadAgentkit, mcpBin, nodeArgs } from "../../lib/artifacts.js";
 import { McpClient, memoryLink, stdioChannel, type ToolResult, toolJson } from "../../lib/mcp.js";
 import { base58Encode } from "../../lib/onboard.js";
-import { opsRoute } from "../../lib/ops-console.js";
 import { md, realStack, stack, WEBHOOK_TIMEOUT_MS } from "../support/env.js";
-import { api, operator, until } from "../support/stage2.js";
+import {
+  api,
+  EVIDENCE_NOT_COMPLETE,
+  operator,
+  reconcile,
+  reconcileLatestCompleteDay,
+  until,
+} from "../support/stage2.js";
 import { catalogue, demoDestination, getInv, sentInvoice, USDC_BASE } from "../support/stage3.js";
 
 type AgentPayment = {
@@ -320,22 +326,12 @@ describe.skipIf(!realStack)("Stage 3 · agents (x402 near-intents, MCP)", () => 
     const op = await operator("ops", "recon3");
     const account = (await import("node:fs")).readFileSync(`${stack().deployDir}/.secrets/demo.json`, "utf8");
     const accountId = (JSON.parse(account) as { account: string }).account;
-    const days = [new Date(Date.now() - 86_400_000).toISOString().slice(0, 10)];
-    if (process.env.NP_E2E_RECON_DAY) days.push(process.env.NP_E2E_RECON_DAY);
-    for (const day of days) {
-      const run = await op.call<{ id: string; status: string }>(opsRoute("createOpsReconciliationRun"), {
-        body: { account_id: accountId, livemode: false, day },
-      });
-      const done = await until(
-        () =>
-          op.call<{ status: string; diff_count: number }>(opsRoute("getOpsReconciliationRun"), {
-            params: { id: run.id },
-          }),
-        (r) => r.status !== "running",
-        3 * 60_000,
-        `${run.id} completed`,
-      );
-      expect(done, JSON.stringify(done)).toMatchObject({ status: "ok", diff_count: 0 });
+    const runs = await reconcileLatestCompleteDay(op, accountId);
+    for (const refused of runs.slice(0, -1)) expect(refused.error).toMatch(EVIDENCE_NOT_COMPLETE);
+    expect(runs.at(-1), JSON.stringify(runs.at(-1))).toMatchObject({ status: "ok", diff_count: 0 });
+    if (process.env.NP_E2E_RECON_DAY) {
+      const run = await reconcile(op, accountId, process.env.NP_E2E_RECON_DAY);
+      expect(run, JSON.stringify(run)).toMatchObject({ status: "ok", diff_count: 0 });
     }
   });
 });
