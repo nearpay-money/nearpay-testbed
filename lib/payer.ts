@@ -5,6 +5,7 @@
  * deposit (`route_quote`, test helper) or sign and submit the Intents transfer (`intents_transfer`, T3).
  */
 import {
+  type AttestationCheck,
   buildTransferPayment,
   type IntentSigner,
   type PinnedSentinelKey,
@@ -73,6 +74,8 @@ export interface AttestedAttempt {
   attempt: PayerAttempt;
   merchant: { name: string; kyb_verified: boolean };
   fingerprint: string;
+  /** The verified attestation (deposit, destination and, since sentinel v1.10, the attested origin asset). */
+  attestation: Extract<AttestationCheck, { ok: true }>["attestation"];
 }
 
 /** Splits `https://pay…/c/cs_…#cs_…_secret_…` into session id and client secret. */
@@ -165,6 +168,7 @@ export async function attestedAttempt(
     attempt,
     merchant: check.attestation.merchant,
     fingerprint: check.attestation.destination.fingerprint,
+    attestation: check.attestation,
   };
 }
 
