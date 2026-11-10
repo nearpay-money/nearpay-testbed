@@ -386,9 +386,55 @@ export function keyPrefix(secret: string): string {
 // Options
 // ---------------------------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------------------------
+// KYB (open onboarding, ADR-0024)
+// ---------------------------------------------------------------------------------------------
+
+export type KybMode = "auto" | "manual";
+
+/**
+ * Self-declared demo business details for `updateKybProfile`. No registration number: it is optional
+ * since ADR-0024, and the demo merchant proves that path.
+ */
+export function demoKybProfile(business: string, country: string) {
+  return {
+    legal_name: business,
+    country_of_incorporation: country,
+    business_type: "company" as const,
+    website: null,
+    business_address: { line1: "1 Demo Street", city: "Demo City", country },
+    representative: { name: "Demo Owner", title: "Founder" },
+    expected_monthly_volume: "under_10k" as const,
+  };
+}
+
+export type KybStep = "done" | "submit" | "wait" | "decide" | "rejected";
+
+/**
+ * Next KYB step for `onboard:live`. With compliance on `NP_KYB_MODE=auto` (default) a submission is
+ * decided by the system at once, so the script only submits and waits — it never calls `kyb-decide`.
+ * Only `manual` (a review is turned back on) decides a pending case with the ops CLI.
+ */
+export function kybStep(status: string, mode: KybMode): KybStep {
+  switch (status) {
+    case "approved":
+      return "done";
+    case "rejected":
+      return "rejected";
+    case "pending":
+      return mode === "manual" ? "decide" : "wait";
+    default:
+      return "submit"; // not_started, needs_info
+  }
+}
+
 export interface OnboardOptions {
   email: string;
   business: string;
+  /** Country of incorporation and address of the demo business (ISO 3166-1 alpha-2). */
+  country: string;
+  /** Compliance's `NP_KYB_MODE`: `auto` (default) never calls `kyb-decide`. */
+  kybMode: KybMode;
   deployDir: string;
   merchantKeyFile: string;
   passkeyFile: string;
@@ -402,11 +448,15 @@ export interface OnboardOptions {
 export const ONBOARD_USAGE = `usage: pnpm onboard:live [options]
 
 Onboards the demo merchant on the local stack end to end (sign-up or passkey sign-in, live NEAR
-Intents destination signed with the merchant key, cool-off skip, KYB, live secret key, live webhook
+Intents destination signed with the merchant key, cool-off skip, business details (live at once in
+NP_KYB_MODE=auto), live secret key, live webhook
 endpoint). Safe to re-run: it continues from wherever the last run stopped.
 
   --email <addr>          merchant email (NP_ONBOARD_EMAIL; default ${DEFAULT_EMAIL})
   --business <name>       business name (NP_ONBOARD_BUSINESS; default "${DEFAULT_BUSINESS}")
+  --country <CC>          business country, ISO alpha-2 (NP_ONBOARD_COUNTRY; default GB)
+  --kyb-mode <mode>       compliance KYB mode: auto (default; live at once, no ops step) or manual
+                          (decides the case with the ops CLI) (NP_KYB_MODE)
   --merchant-key <file>   near-cli key JSON of the implicit payout account
                           (NP_MERCHANT_KEY_FILE; default <deploy>/.secrets/accounts/merchant.json)
   --passkey <file>        saved passkey (NP_MERCHANT_PASSKEY_FILE;
@@ -428,6 +478,8 @@ export function parseOnboardArgs(argv: readonly string[], env: Env = {}, cwd = "
     options: {
       email: { type: "string" },
       business: { type: "string" },
+      country: { type: "string" },
+      "kyb-mode": { type: "string" },
       "merchant-key": { type: "string" },
       passkey: { type: "string" },
       state: { type: "string" },
@@ -444,6 +496,10 @@ export function parseOnboardArgs(argv: readonly string[], env: Env = {}, cwd = "
   if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email)) throw new Error(`--email: not an email address: ${email}`);
   const business = (values.business ?? env.NP_ONBOARD_BUSINESS ?? DEFAULT_BUSINESS).trim();
   if (!business || business.length > 100) throw new Error("--business: 1–100 characters");
+  const country = (values.country ?? env.NP_ONBOARD_COUNTRY ?? "GB").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(country)) throw new Error(`--country: not an ISO 3166-1 alpha-2 code: ${country}`);
+  const kybMode = (values["kyb-mode"] ?? env.NP_KYB_MODE ?? "auto").trim();
+  if (kybMode !== "auto" && kybMode !== "manual") throw new Error(`--kyb-mode: auto or manual, not ${kybMode}`);
   const webhookUrl = values["webhook-url"] ?? DEFAULT_WEBHOOK_URL;
   try {
     new URL(webhookUrl);
@@ -457,6 +513,8 @@ export function parseOnboardArgs(argv: readonly string[], env: Env = {}, cwd = "
   return {
     email,
     business,
+    country,
+    kybMode,
     deployDir,
     merchantKeyFile: resolve(
       cwd,

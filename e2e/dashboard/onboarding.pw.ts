@@ -4,7 +4,9 @@
  * authenticator, like nearpay-dashboard's own suite) → live NEAR Intents destination → NEP-413
  * attestation signed by a real key of a fresh implicit account (identity §8.2: hex(pubkey) == address,
  * no RPC) → cool-off (Stage 1 ops CLI skip; local.env keeps 24 h) → `activated` (security email) →
- * KYB submitted from Home → ops CLI KYB decision → account live.
+ * business details saved (no registration number) → compliance decides at once (NP_KYB_MODE=auto,
+ * ADR-0024; no ops step) → account live. With NP_KYB_MODE=manual on the stack, the trace keeps the
+ * Stage 1 ops CLI decision.
  */
 import "../../lib/localhost-dns.js";
 import { randomBytes } from "node:crypto";
@@ -215,13 +217,12 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
   await expect(page.getByTestId("destinations-table")).toContainText(fingerprint);
   await mail(page, email, /destination/i); // notify's security email on activation
 
-  // self-declared business details (Settings → Business details, ADR-0020 d3) → the ops decision (Stage 1 CLI;
-  // the console path is e2e/stage2/console.e2e.test.ts) → identity live_enabled
+  // self-declared business details (Settings → Business details, ADR-0020 d3) → automatic decision
+  // (open onboarding, ADR-0024) → identity live_enabled. Manual review mode keeps the ops CLI decision.
   await page.goto(`${st.dashboardUrl}/settings/business`);
   await page.getByLabel("Registered legal name").fill(`${business} GmbH`);
   await page.getByLabel("Country of incorporation").selectOption("DE");
   await page.getByLabel("Business type").selectOption("company");
-  await page.getByLabel("Registration number").fill("HRB 1234");
   await page.getByLabel("Expected monthly volume").selectOption("under_10k");
   await page.getByLabel("Street address").fill("Teststr. 1");
   await page.getByLabel("City").fill("Berlin");
@@ -233,12 +234,21 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
   await page.getByTestId("kyb-submit").click();
   if (await stepUp.isVisible({ timeout: 5_000 }).catch(() => false))
     await page.getByRole("button", { name: "Confirm with passkey" }).click();
-  await expect
-    .poll(() => JSON.stringify(ops("compliance-api", ["kyb-show", account]).json), { timeout: 30_000 })
-    .toMatch(/"status":\s*"pending"/);
-  expect(
-    runCli(["kyb-decide", account, "approved", "--reason", "testbed T1"], { deployDir: st.deployDir, out: () => {} }),
-  ).toBe(0);
+  if (process.env.NP_KYB_MODE === "manual") {
+    await expect
+      .poll(() => JSON.stringify(ops("compliance-api", ["kyb-show", account]).json), { timeout: 30_000 })
+      .toMatch(/"status":\s*"pending"/);
+    expect(
+      runCli(["kyb-decide", account, "approved", "--reason", "testbed T1"], { deployDir: st.deployDir, out: () => {} }),
+    ).toBe(0);
+  } else {
+    await expect(page.getByTestId("kyb-status")).toContainText("You're live — you can accept real payments", {
+      timeout: 30_000,
+    });
+    const kyb = JSON.stringify(ops("compliance-api", ["kyb-show", account]).json);
+    expect(kyb).toMatch(/"status":\s*"approved"/);
+    expect(kyb).toMatch(/"decided_by":\s*"system"/);
+  }
   await expect
     .poll(() => JSON.stringify(ops("identity-api", ["account-show", account]).json), { timeout: 60_000 })
     .toMatch(/"live_enabled":\s*true/);

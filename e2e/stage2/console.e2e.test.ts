@@ -5,8 +5,9 @@
  *  a) two-person kill-switch release: `ops` engages; an `ops_admin` requests the release; the requester cannot
  *     approve (403 approver_conflict), an `ops` cannot approve (403 permission_denied, kit `ops_role`), a second
  *     `ops_admin` approves → released, both recorded as actors;
- *  b) a new merchant (dashboard passkey sign-up) adds a live destination (NEP-413), submits self-declared KYB;
- *     an operator approves it in the console → the account goes live.
+ *  b) a new merchant (dashboard passkey sign-up) adds a live destination (NEP-413), submits self-declared KYB
+ *     (live at once with NP_KYB_MODE=auto, ADR-0024; console approval only with NP_KYB_MODE=manual);
+ *     the account goes live; an operator rejects it for abuse (live off) and reverses it (live again).
  * Also: the console host serves the console and its anonymous sign-in allow-list only.
  */
 import { randomUUID } from "node:crypto";
@@ -73,7 +74,7 @@ describe.skipIf(!realStack)("Stage 2 · console smoke", () => {
     expect((await engager.call<KillSwitch>(opsRoute("getOpsKillSwitch"))).engaged).toBe(false);
   });
 
-  it("b) self-declared KYB submit → console approval → live mode", async () => {
+  it("b) self-declared KYB submit → live at once (auto) or console approval (manual) → abuse reject/reverse", async () => {
     const st = stack();
     const email = `kyb-${randomUUID().slice(0, 8)}@merchant.test`;
     const merchant = await DashboardSession.signUp(st.dashboardUrl, {
@@ -111,13 +112,13 @@ describe.skipIf(!realStack)("Stage 2 · console smoke", () => {
     expect(skip.code, skip.stderr).toBe(0);
     merchant.mode = undefined;
 
-    // self-declared business details (ADR-0020 d3), submitted with the owner's declaration
+    // self-declared business details (ADR-0020 d3), submitted with the owner's declaration; no
+    // registration number (optional since ADR-0024)
     await merchant.call(startKyb, { body: {} });
     await merchant.call(updateKybProfile, {
       body: {
         legal_name: "Console Smoke Shop GmbH",
         country_of_incorporation: "DE",
-        registration_number: "HRB 24",
         business_type: "company",
         website: "https://smoke.example",
         business_address: { line1: "Teststr. 1", city: "Berlin", postal_code: "10115", country: "DE" },
@@ -125,27 +126,33 @@ describe.skipIf(!realStack)("Stage 2 · console smoke", () => {
         expected_monthly_volume: "under_10k",
       },
     });
-    expect((await merchant.call<{ status: string }>(submitKyb, { body: { declaration: true } })).status).toBe(
-      "pending",
-    );
+    const manual = process.env.NP_KYB_MODE === "manual";
+    const submitted = await merchant.call<{ status: string }>(submitKyb, { body: { declaration: true } });
+    // open onboarding (NP_KYB_MODE=auto, ADR-0024): decided by the system in the same request
+    expect(submitted.status).toBe(manual ? "pending" : "approved");
 
     const op = await operator("ops", "kyb");
     const cases = await until(
       () =>
-        op.call<{ data: { account_id: string; status: string }[] }>(opsRoute("listOpsKybCases"), {
-          query: { account: account.id },
-        }),
-      (l) => l.data.some((c) => c.account_id === account.id && c.status === "pending"),
+        op.call<{ data: { account_id: string; status: string; decided_by: string | null }[] }>(
+          opsRoute("listOpsKybCases"),
+          { query: { account: account.id, status: manual ? "pending" : "approved" } },
+        ),
+      (l) => l.data.some((c) => c.account_id === account.id),
       30_000,
-      "pending KYB case",
+      "business in the console list",
     );
     expect(cases.data[0]?.account_id).toBe(account.id);
-    // decideOpsKybCase needs a step-up: the client answers 401 step_up_required with the passkey and replays
-    const decided = await op.call<{ status: string }>(opsRoute("decideOpsKybCase"), {
-      params: { id: account.id },
-      body: { decision: "approved", reason: "testbed E2E (step 2.4)" },
-    });
-    expect(decided.status).toBe("approved");
+    if (manual) {
+      // decideOpsKybCase needs a step-up: the client answers 401 step_up_required with the passkey and replays
+      const decided = await op.call<{ status: string }>(opsRoute("decideOpsKybCase"), {
+        params: { id: account.id },
+        body: { decision: "approved", reason: "testbed E2E (manual review mode)" },
+      });
+      expect(decided.status).toBe("approved");
+    } else {
+      expect(cases.data[0]?.decided_by).toBe("system");
+    }
 
     const live = await until(
       () => merchant.call<{ live_enabled: boolean; kyb_status: string }>(getAccount),
@@ -155,5 +162,28 @@ describe.skipIf(!realStack)("Stage 2 · console smoke", () => {
     );
     expect(live.kyb_status).toBe("approved");
     expect((await merchant.call<{ status: string }>(getKyb)).status).toBe("approved");
+
+    // abuse: an operator rejects the business → live mode off; reversing it turns live mode back on
+    const rejected = await op.call<{ status: string }>(opsRoute("decideOpsKybCase"), {
+      params: { id: account.id },
+      body: { decision: "rejected", reason: "testbed E2E: abuse report" },
+    });
+    expect(rejected.status).toBe("rejected");
+    await until(
+      () => merchant.call<{ live_enabled: boolean }>(getAccount),
+      (a) => !a.live_enabled,
+      60_000,
+      `${account.id} live mode off after the rejection`,
+    );
+    await op.call(opsRoute("decideOpsKybCase"), {
+      params: { id: account.id },
+      body: { decision: "approved", reason: "testbed E2E: report withdrawn" },
+    });
+    await until(
+      () => merchant.call<{ live_enabled: boolean }>(getAccount),
+      (a) => a.live_enabled,
+      60_000,
+      `${account.id} live again after the reversal`,
+    );
   });
 });
