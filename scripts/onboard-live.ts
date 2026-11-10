@@ -11,7 +11,9 @@
  *   3. destination — live USDC NEAR Intents destination for the merchant key's implicit account;
  *                  the NEP-413 attestation is signed in Node with that key (`--merchant-key`).
  *   4. cool-off  — Stage 1 ops CLI skip (local stacks).
- *   5. KYB       — submitted through the API, approved with the ops CLI → `live_enabled`.
+ *   5. KYB       — self-declared business details submitted through the API; compliance decides at
+ *                  once (NP_KYB_MODE=auto, ADR-0024) → `live_enabled`. Only `--kyb-mode manual`
+ *                  decides the case with the ops CLI.
  *   6. live key  — `sk_live_…` written to `<secrets-dir>/secret_key` (0600).
  *   7. webhook   — live endpoint (`*`), its signing secret appended to `<secrets-dir>/webhook_secret`.
  *
@@ -30,11 +32,13 @@ import {
   appendSecret,
   credentialForReuse,
   type DestinationLike,
+  demoKybProfile,
   findDestination,
   hasSecretHash,
   KEY_NAME,
   keyInFile,
   keyPrefix,
+  kybStep,
   loadPasskey,
   loadState,
   type MerchantKey,
@@ -520,24 +524,34 @@ interface Account {
   status: string;
 }
 
-/** 5. KYB submitted and approved (ops CLI) → live_enabled. */
+/**
+ * 5. Business details declared and submitted → compliance decides at once (NP_KYB_MODE=auto,
+ * ADR-0024) → live_enabled. `--kyb-mode manual` decides a pending case with the ops CLI.
+ */
 async function ensureLive(c: Ctx, accountId: string): Promise<void> {
   let a = await c.api.call<Account>("GET", "/v1/account");
   if (a.live_enabled) {
     step(5, `KYB ${a.kyb_status}, live_enabled`);
     return;
   }
-  step(5, `KYB ${a.kyb_status}`);
-  if (a.kyb_status === "rejected") {
-    throw new Error(`KYB of ${accountId} was rejected; decide it again with pnpm ops kyb-decide if that was a mistake`);
+  step(5, `KYB ${a.kyb_status} (NP_KYB_MODE=${c.o.kybMode})`);
+  let kyb = await c.api.call<{ status: string }>("GET", "/v1/account/kyb");
+  let next = kybStep(kyb.status, c.o.kybMode);
+  if (next === "rejected") {
+    throw new Error(`KYB of ${accountId} was rejected; reverse it in the console (Businesses) if that was a mistake`);
   }
-  if (a.kyb_status === "not_started") {
-    await c.api.call("POST", "/v1/account/kyb", { idempotent: true, body: {} });
-    log("      KYB submitted");
+  if (next === "submit") {
+    await c.api.call("PATCH", "/v1/account/kyb", { body: demoKybProfile(c.o.business, c.o.country) });
+    kyb = await c.api.call<{ status: string }>("POST", "/v1/account/kyb/submit", {
+      idempotent: true,
+      body: { declaration: true },
+    });
+    log(`      business details submitted → ${kyb.status}`);
+    next = kybStep(kyb.status, c.o.kybMode);
+    if (next === "rejected") throw new Error(`KYB of ${accountId} was rejected automatically (geo policy?)`);
   }
-  a = await c.api.call<Account>("GET", "/v1/account");
-  if (a.kyb_status !== "approved") {
-    log("      ops kyb-decide approved");
+  if (next === "decide") {
+    log("      manual review mode: ops kyb-decide approved");
     opsCli(c, ["kyb-decide", accountId, "approved", "--reason", "demo merchant (pnpm onboard:live)"]);
   }
   const deadline = Date.now() + 90_000;
@@ -546,7 +560,12 @@ async function ensureLive(c: Ctx, accountId: string): Promise<void> {
     if (a.live_enabled) break;
     await sleep(2000);
   }
-  if (!a.live_enabled) throw new Error(`account ${accountId} is not live_enabled (kyb ${a.kyb_status}, ${a.status})`);
+  if (!a.live_enabled)
+    throw new Error(
+      `account ${accountId} is not live_enabled (kyb ${a.kyb_status}, ${a.status})${
+        a.kyb_status === "pending" ? "; compliance may run NP_KYB_MODE=manual: rerun with --kyb-mode manual" : ""
+      }`,
+    );
   log("      live_enabled");
 }
 

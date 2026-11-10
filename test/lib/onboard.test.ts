@@ -12,12 +12,14 @@ import {
   DEFAULT_BUSINESS,
   DEFAULT_EMAIL,
   DEFAULT_WEBHOOK_URL,
+  demoKybProfile,
   fileMode,
   findDestination,
   generateMerchantKey,
   hasSecretHash,
   keyInFile,
   keyPrefix,
+  kybStep,
   loadPasskey,
   loadState,
   type PasskeyRecord,
@@ -322,6 +324,8 @@ describe("parseOnboardArgs", () => {
     expect(o).toStrictEqual({
       email: DEFAULT_EMAIL,
       business: DEFAULT_BUSINESS,
+      country: "GB",
+      kybMode: "auto",
       deployDir: "/work/nearpay-deploy",
       merchantKeyFile: "/work/nearpay-deploy/.secrets/accounts/merchant.json",
       passkeyFile: "/work/nearpay-deploy/.secrets/accounts/merchant-passkey.json",
@@ -342,6 +346,8 @@ describe("parseOnboardArgs", () => {
       NP_MERCHANT_PASSKEY_FILE: "/p/pk.json",
       NP_ONBOARD_SECRETS_DIR: "/s",
       NP_HEADED: "1",
+      NP_ONBOARD_COUNTRY: "de",
+      NP_KYB_MODE: "manual",
     };
     const fromEnv = parseOnboardArgs([], env, "/w");
     expect(fromEnv).toMatchObject({
@@ -353,6 +359,8 @@ describe("parseOnboardArgs", () => {
       stateFile: "/p/merchant-onboard.json",
       secretsDir: "/s",
       headed: true,
+      country: "DE",
+      kybMode: "manual",
     });
     const flags = parseOnboardArgs(
       [
@@ -360,6 +368,10 @@ describe("parseOnboardArgs", () => {
         "f@x.test",
         "--business",
         "Flag Shop",
+        "--country",
+        "fr",
+        "--kyb-mode",
+        "auto",
         "--merchant-key",
         "k2.json",
         "--passkey",
@@ -381,6 +393,8 @@ describe("parseOnboardArgs", () => {
     expect(flags).toStrictEqual({
       email: "f@x.test",
       business: "Flag Shop",
+      country: "FR",
+      kybMode: "auto",
       deployDir: "/d2",
       merchantKeyFile: "/w/k2.json",
       passkeyFile: "/w/pk2.json",
@@ -397,9 +411,38 @@ describe("parseOnboardArgs", () => {
     [["--business", "  "]],
     [["--business", "x".repeat(101)]],
     [["--webhook-url", "not a url"]],
+    [["--country", "GBR"]],
+    [["--kyb-mode", "review"]],
     [["--unknown"]],
     [["positional"]],
   ])("rejects %j", (argv) => {
     expect(() => parseOnboardArgs(argv, {}, "/w")).toThrow();
+  });
+});
+
+describe("KYB step (open onboarding, ADR-0024)", () => {
+  it("auto mode submits and waits; it never decides with the ops CLI", () => {
+    for (const status of ["not_started", "needs_info", "pending", "approved", "rejected"])
+      expect(kybStep(status, "auto")).not.toBe("decide");
+    expect(kybStep("not_started", "auto")).toBe("submit");
+    expect(kybStep("needs_info", "auto")).toBe("submit");
+    expect(kybStep("pending", "auto")).toBe("wait");
+    expect(kybStep("approved", "auto")).toBe("done");
+    expect(kybStep("rejected", "auto")).toBe("rejected");
+  });
+  it("manual mode decides a pending case with the ops CLI", () => {
+    expect(kybStep("pending", "manual")).toBe("decide");
+    expect(kybStep("not_started", "manual")).toBe("submit");
+    expect(kybStep("approved", "manual")).toBe("done");
+  });
+  it("declares a complete demo profile without a registration number", () => {
+    const p = demoKybProfile("NearPay Demo Store", "GB");
+    expect(p).toMatchObject({
+      legal_name: "NearPay Demo Store",
+      country_of_incorporation: "GB",
+      business_address: { country: "GB" },
+      representative: { name: "Demo Owner", title: "Founder" },
+    });
+    expect(p).not.toHaveProperty("registration_number");
   });
 });
