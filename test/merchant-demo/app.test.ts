@@ -1,6 +1,6 @@
 /** merchant-demo against the mock stack: sessions, webhooks, orders, and the x402 loop with a real agent. */
-import { nearSigner, staticSaltProvider } from "@nearpay/agent-signer";
-import { decodePaymentResponse, withX402 } from "@nearpay/x402";
+import { nearSigner, staticSaltProvider } from "@nearpay-money/agent-signer";
+import { decodePaymentResponse, withX402 } from "@nearpay-money/x402";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { merchantDemo } from "../../lib/merchant-demo.js";
 import { type MockStack, startMerchantDemo, startMockStack, USDC } from "../support/mock-stack.js";

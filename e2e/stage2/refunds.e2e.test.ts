@@ -17,7 +17,7 @@ import {
   type Refund,
   simulateRefundDeposit,
   submitRefundTx,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { beforeAll, describe, expect, it } from "vitest";
 import { agentSigner, USDC } from "../../demo/agent.js";
 import { payBySimulatedDeposit, payFromIntentsBalance, sessionFromUrl, TEST_REFUND_EVM } from "../../lib/payer.js";

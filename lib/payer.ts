@@ -12,7 +12,7 @@ import {
   type SaltProvider,
   staticSaltProvider,
   verifyAttestation,
-} from "@nearpay/agent-signer";
+} from "@nearpay-money/agent-signer";
 import {
   createDepositInstructionsAttestation,
   createPaymentAttempt,
@@ -22,7 +22,7 @@ import {
   simulateDeposit,
   submitSignedIntent,
   type z,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { ApiError, call } from "./http.js";
 
 /** Cloudflare's always-pass test token: the local stack uses the always-pass test secret. */

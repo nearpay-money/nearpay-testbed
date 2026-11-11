@@ -1,5 +1,5 @@
 /** Scripted payers (T3 human Intents balance, T5 agent) against the mock stack. */
-import { nearSigner, payCheckoutSession, staticSaltProvider } from "@nearpay/agent-signer";
+import { nearSigner, payCheckoutSession, staticSaltProvider } from "@nearpay-money/agent-signer";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ApiError } from "../../lib/http.js";
 import { merchantDemo } from "../../lib/merchant-demo.js";

@@ -6,7 +6,7 @@
  * moved → next renewal left unpaid → clock to `overdue` (`invoice.overdue`, `past_due`, dunning reminder mails) →
  * paid late → `active` again. Every step is checked on the merchant-demo webhooks (signature-verified).
  */
-import { advanceSubscriptionClock, getSubscription, listInvoices } from "@nearpay/spec";
+import { advanceSubscriptionClock, getSubscription, listInvoices } from "@nearpay-money/spec";
 import { beforeAll, describe, expect, it } from "vitest";
 import { md, realStack, WEBHOOK_TIMEOUT_MS } from "../support/env.js";
 import { api, until } from "../support/stage2.js";

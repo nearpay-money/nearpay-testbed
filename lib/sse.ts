@@ -4,7 +4,7 @@
  * Frames are parsed per the HTML living standard's event-stream rules (field `data` joined by newlines, `id`,
  * `event`, `retry`; lines starting with `:` are comments).
  */
-import { API_VERSION, HEADERS } from "@nearpay/spec";
+import { API_VERSION, HEADERS } from "@nearpay-money/spec";
 
 export interface SseFrame {
   event: string;

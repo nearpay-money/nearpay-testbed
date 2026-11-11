@@ -16,7 +16,7 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { type PinnedSentinelKey, parsePinnedKeys } from "@nearpay/agent-signer";
+import { type PinnedSentinelKey, parsePinnedKeys } from "@nearpay-money/agent-signer";
 
 export interface Stack {
   baseDomain: string;

@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { nep413Hash } from "@nearpay/agent-signer";
+import { nep413Hash } from "@nearpay-money/agent-signer";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { describe, expect, it } from "vitest";
 import {

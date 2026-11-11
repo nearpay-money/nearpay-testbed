@@ -165,8 +165,8 @@ describe("artifacts", () => {
   });
 
   it("finds installed packages and falls back to repository build output", async () => {
-    expect(installedVersion("@nearpay/spec")).toMatch(/^0\.4\./);
-    expect(installedVersion("@nearpay/does-not-exist")).toBeNull();
+    expect(installedVersion("@nearpay-money/spec")).toMatch(/^0\.5\./);
+    expect(installedVersion("@nearpay-money/does-not-exist")).toBeNull();
     const repos = mkdtempSync(join(tmpdir(), "np-repos-"));
     expect(reposDir({ NP_REPOS_DIR: repos })).toBe(repos);
     expect(() => agentkitEntry("mcp", { NP_REPOS_DIR: repos })).toThrow(/neither installed nor built/);
@@ -180,10 +180,13 @@ describe("artifacts", () => {
     mkdirSync(join(repos, "nearpay-cli/dist"), { recursive: true });
     writeFileSync(join(repos, "nearpay-cli/dist/cli.js"), "");
     const env = { NP_REPOS_DIR: repos };
-    // the installed @nearpay/x402 (0.1.x) is older than the Stage 3 minimum, so the build output wins
-    expect(atLeast(installedVersion("@nearpay/x402") ?? "0.0.0", AGENTKIT_MIN)).toBe(false);
-    expect(agentkitEntry("x402", env)).toMatch(/^file:.*packages\/x402\/dist\/index\.js$/);
-    expect((await loadAgentkit("x402", env)).name).toBe("x402");
+    // the installed @nearpay-money/x402 (0.3.x) meets the Stage 3 minimum, so the package wins over build output
+    expect(atLeast(installedVersion("@nearpay-money/x402") ?? "0.0.0", AGENTKIT_MIN)).toBe(true);
+    expect(agentkitEntry("x402", env)).toBe("@nearpay-money/x402");
+    // @nearpay-money/mcp is not installed here, so the repository build output is used
+    expect(installedVersion("@nearpay-money/mcp")).toBeNull();
+    expect(agentkitEntry("mcp", env)).toMatch(/^file:.*packages\/mcp\/dist\/index\.js$/);
+    expect((await loadAgentkit("mcp", env)).name).toBe("mcp");
     expect(mcpBin(env)).toBe(join(repos, "nearpay-agentkit/packages/mcp/dist/bin.js"));
     expect(cliBin(env)).toBe(join(repos, "nearpay-cli/dist/cli.js"));
     expect(nodeArgs("/e.js", ["a"])).toEqual(["--import", PRELOAD, "/e.js", "a"]);

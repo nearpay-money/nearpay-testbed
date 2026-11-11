@@ -1,9 +1,9 @@
 /**
  * T5 — an agent pays a checkout session: agent_pay/requirements → sentinel co-signature verified by
- * @nearpay/agent-signer with the pinned key (audit S-05) → agent_pay → relay → indexer → success.
+ * @nearpay-money/agent-signer with the pinned key (audit S-05) → agent_pay → relay → indexer → success.
  * Precondition (test mode): the agent's sandbox Intents balance is funded.
  */
-import { payCheckoutSession, staticSaltProvider } from "@nearpay/agent-signer";
+import { payCheckoutSession, staticSaltProvider } from "@nearpay-money/agent-signer";
 import { describe, expect, it } from "vitest";
 import { agentSigner, USDC } from "../../demo/agent.js";
 import { enabled, md, stack, WEBHOOK_TIMEOUT_MS } from "../support/env.js";

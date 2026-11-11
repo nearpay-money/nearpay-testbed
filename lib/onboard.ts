@@ -11,7 +11,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { nep413Hash } from "@nearpay/agent-signer";
+import { nep413Hash } from "@nearpay-money/agent-signer";
 import { ed25519 } from "@noble/curves/ed25519.js";
 
 export const USDC_NEAR = "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1";

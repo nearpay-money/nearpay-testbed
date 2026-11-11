@@ -4,7 +4,7 @@
  * agentpay pauses live x402 settles and checkout relays (agentpay §8); the Stage 1 ops CLI release
  * resumes both. Real stack only (in-container ops CLIs via docker compose exec).
  */
-import { createDepositInstructionsAttestation } from "@nearpay/spec";
+import { createDepositInstructionsAttestation } from "@nearpay-money/spec";
 import { afterAll, describe, expect, it } from "vitest";
 import { ApiError, call } from "../../lib/http.js";
 import { waitFor } from "../../lib/wait.js";

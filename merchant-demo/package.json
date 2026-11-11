@@ -15,9 +15,9 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
-    "@nearpay/node": "0.1.0",
-    "@nearpay/spec": "0.1.4",
-    "@nearpay/x402": "0.1.1",
+    "@nearpay-money/node": "0.4.0",
+    "@nearpay-money/spec": "0.5.0",
+    "@nearpay-money/x402": "0.3.0",
     "express": "5.3.0",
     "zod": "4.6.7"
   },
@@ -28,7 +28,7 @@
   },
   "pnpm": {
     "overrides": {
-      "@nearpay/spec": "0.1.4"
+      "@nearpay-money/spec": "0.5.0"
     }
   }
 }

@@ -1,5 +1,5 @@
 /** Calls public NearPay routes from the spec route tables (secret key or client secret auth). */
-import { type AnyRoute, API_VERSION, ErrorEnvelope, HEADERS } from "@nearpay/spec";
+import { type AnyRoute, API_VERSION, ErrorEnvelope, HEADERS } from "@nearpay-money/spec";
 
 export class ApiError extends Error {
   constructor(

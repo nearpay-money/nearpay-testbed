@@ -1,6 +1,6 @@
 /**
  * `pnpm demo:agent` — Stage 1 demo script step 5 (roadmap/development-plan.md §3): an AI agent calls
- * merchant-demo `/premium`, receives `402`, signs a NEAR Intents transfer (`@nearpay/agent-signer`
+ * merchant-demo `/premium`, receives `402`, signs a NEAR Intents transfer (`@nearpay-money/agent-signer`
  * via `withX402`), receives the resource with `PAYMENT-RESPONSE`, then `agent_payment.settled`
  * arrives at merchant-demo.
  *
@@ -12,9 +12,9 @@
  */
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { type IntentSigner, nearSigner, rpcSaltProvider, staticSaltProvider } from "@nearpay/agent-signer";
-import { encodeX402Header, HEADERS, type PaymentPayload } from "@nearpay/spec";
-import { decodePaymentResponse, parsePaymentRequired, withX402 } from "@nearpay/x402";
+import { type IntentSigner, nearSigner, rpcSaltProvider, staticSaltProvider } from "@nearpay-money/agent-signer";
+import { encodeX402Header, HEADERS, type PaymentPayload } from "@nearpay-money/spec";
+import { decodePaymentResponse, parsePaymentRequired, withX402 } from "@nearpay-money/x402";
 import { merchantDemo } from "../lib/merchant-demo.js";
 import { type Stack, stackFromEnv } from "../lib/stack.js";
 
@@ -84,7 +84,8 @@ export async function runAgentDemo(
       ? rpcSaltProvider(env.NP_NEAR_RPC_URLS ? { rpcUrls: env.NP_NEAR_RPC_URLS.split(",") } : {})
       : staticSaltProvider("00000000"),
     onPayment: ({ payload }) => {
-      paidPayload = payload;
+      // No `crossChain` option: the client only pays `intents-transfer`, so this is the spec's PaymentPayload.
+      paidPayload = payload as PaymentPayload;
     },
   });
   const t0 = Date.now();

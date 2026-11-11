@@ -8,8 +8,8 @@
  * testbed signs with one fixed test-only key. Never use it outside a local test-mode stack.
  */
 import { createHash } from "node:crypto";
-import { nep413Hash } from "@nearpay/agent-signer";
-import type { MultiPayload } from "@nearpay/spec";
+import { nep413Hash } from "@nearpay-money/agent-signer";
+import type { MultiPayload } from "@nearpay-money/spec";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { base58Encode } from "./onboard.js";
 

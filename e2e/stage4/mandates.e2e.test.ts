@@ -24,7 +24,7 @@ import {
   HEADERS,
   listInvoices,
   prepareMandate,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { beforeAll, describe, expect, it } from "vitest";
 import { call } from "../../lib/http.js";
 import { realStack, stack } from "../support/env.js";

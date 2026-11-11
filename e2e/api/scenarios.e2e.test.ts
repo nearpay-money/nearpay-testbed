@@ -13,7 +13,7 @@ import {
   type PaymentIntent,
   simulateDeposit,
   type z,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { describe, expect, it } from "vitest";
 import { call } from "../../lib/http.js";
 import { attestedAttempt, payBySimulatedDeposit, sessionFromUrl, TEST_REFUND_EVM, USDC_BASE } from "../../lib/payer.js";

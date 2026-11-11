@@ -14,7 +14,7 @@
  *   (`floor(share / 2)`), `fee: "0"`: the invoice is not paid but voided with the collection recorded, and a
  *   `send_invoice` balance invoice for the shortfall is sent.
  */
-import { listInvoices, prepareMandate } from "@nearpay/spec";
+import { listInvoices, prepareMandate } from "@nearpay-money/spec";
 import { beforeAll, describe, expect, it } from "vitest";
 import { md as demo, realStack, slow } from "../support/env.js";
 import { api, until } from "../support/stage2.js";

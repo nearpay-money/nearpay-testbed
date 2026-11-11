@@ -18,7 +18,7 @@ import {
   SOLANA_MAINNET,
   simulateDeposit,
   solanaPayUri,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { describe, expect, it } from "vitest";
 import { call } from "../../lib/http.js";
 import { base58Decode } from "../../lib/onboard.js";

@@ -22,7 +22,7 @@ import {
   parseVaultEventLog,
   simulateMandateFunding,
   simulateMandatePayerAction,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { md, ops, WEBHOOK_TIMEOUT_MS } from "./env.js";
 import { api, ensureWebhookEvents, until } from "./stage2.js";
 import {
