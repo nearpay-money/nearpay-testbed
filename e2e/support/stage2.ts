@@ -4,7 +4,7 @@
  * merchant-demo webhook endpoint's Stage 2 events, and polling.
  */
 import { randomUUID } from "node:crypto";
-import { listWebhookEndpoints, updateWebhookEndpoint } from "@nearpay/spec";
+import { listWebhookEndpoints, updateWebhookEndpoint } from "@nearpay-money/spec";
 import { call, type RouteCall } from "../../lib/http.js";
 import { enrolmentToken, mailpit, OpsConsole, opsRoute } from "../../lib/ops-console.js";
 import { ops, stack } from "./env.js";

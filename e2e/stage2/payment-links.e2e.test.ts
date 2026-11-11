@@ -14,7 +14,7 @@ import {
   getPaymentLink,
   getPublicPaymentLink,
   HEADERS,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { describe, expect, it } from "vitest";
 import { call } from "../../lib/http.js";
 import { payBySimulatedDeposit, TURNSTILE_TEST_TOKEN, USDC_BASE } from "../../lib/payer.js";

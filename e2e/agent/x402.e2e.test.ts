@@ -3,7 +3,7 @@
  * verify/settle → 200 + PAYMENT-RESPONSE → `agent_payment.settled` webhook (demo script step 5).
  * Precondition (test mode): the agent's sandbox Intents balance is funded (see README "Agent funding").
  */
-import { decodePaymentResponse } from "@nearpay/x402";
+import { decodePaymentResponse } from "@nearpay-money/x402";
 import { describe, expect, it } from "vitest";
 import { runAgentDemo } from "../../demo/agent.js";
 import { enabled, md } from "../support/env.js";

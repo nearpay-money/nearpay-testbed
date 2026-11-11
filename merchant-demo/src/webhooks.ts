@@ -1,10 +1,10 @@
 /**
- * Webhook receiver (api-conventions §9, lld/webhooks.md §6): `@nearpay/node` `constructEvent` verifies
+ * Webhook receiver (api-conventions §9, lld/webhooks.md §6): `@nearpay-money/node` `constructEvent` verifies
  * `NearPay-Signature` v1 (HMAC-SHA256 over `<t>.<raw body>`, any v1 value, constant time, 300 s) on the
  * raw body bytes; the event is then kept (deduplicated by id) for the demo page and the demo scripts.
  */
-import { constructEvent } from "@nearpay/node";
-import { EventEnvelopeLoose, type z } from "@nearpay/spec";
+import { constructEvent } from "@nearpay-money/node";
+import { EventEnvelopeLoose, type z } from "@nearpay-money/spec";
 
 export type WebhookEvent = z.output<typeof EventEnvelopeLoose>;
 

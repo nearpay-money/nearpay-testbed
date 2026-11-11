@@ -5,21 +5,22 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@nearpay/spec': 0.4.0
+  '@nearpay-money/spec': 0.5.0
+  '@nearpay/spec': npm:@nearpay-money/spec@0.5.0
 
 importers:
 
   .:
     dependencies:
-      '@nearpay/agent-signer':
-        specifier: 0.1.1
-        version: 0.1.1(zod@4.6.7)
-      '@nearpay/spec':
-        specifier: 0.4.0
-        version: 0.4.0(zod@4.6.7)
-      '@nearpay/x402':
-        specifier: 0.1.1
-        version: 0.1.1(zod@4.6.7)
+      '@nearpay-money/agent-signer':
+        specifier: 0.3.0
+        version: 0.3.0(zod@4.6.7)
+      '@nearpay-money/spec':
+        specifier: 0.5.0
+        version: 0.5.0(zod@4.6.7)
+      '@nearpay-money/x402':
+        specifier: 0.3.0
+        version: 0.3.0(zod@4.6.7)
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -497,20 +498,20 @@ packages:
     peerDependencies:
       zod: ^4.6.7
 
-  '@nearpay/agent-signer@0.1.1':
-    resolution: {integrity: sha512-VaGJOoYSZi/4kx78QiUEmA8W5ZglEIJJf1inxN5GpKGM0AnOFM9s7ZD5ehNQajQAubHgtiZ+NiCbwfzjVhew9g==}
+  '@nearpay-money/agent-signer@0.3.0':
+    resolution: {integrity: sha512-nyh0SguJzIhNVL1fqbZxpP0of4yovkDHYlOxCYyq8P4KkXBT74TuwZR4wg7/wVnrx5xeka/oRKPR/yvzel3exQ==}
     engines: {node: '>=22.11.0'}
     peerDependencies:
       zod: ^4.6.7
 
-  '@nearpay/spec@0.4.0':
-    resolution: {integrity: sha512-rb7i9t/lU0lGF+hg7iHFs6qejCuTIDZ4C71aPHHMHlsztgu6giI0GQ0STYKk036crsF7X3Ocyna0E7L01XrqEg==}
+  '@nearpay-money/spec@0.5.0':
+    resolution: {integrity: sha512-hvuwO+DjlZu4PIxQTjYWkZuTeg8pVPEMLTFDHqz7P9h2z/L7U6YNh+O9pI6j/90hnZotkAbVMUb9Rje5YDldQw==}
     engines: {node: '>=22.11.0'}
     peerDependencies:
       zod: ^4.6.7
 
-  '@nearpay/x402@0.1.1':
-    resolution: {integrity: sha512-CZ4CKRidugaU6X6rmf7V2a5jWExxPIZ9KKpFTIP4sCM9joZmv4i8LXcIe0mqokTXGVnx+iAnZKp1fTEaglC9nw==}
+  '@nearpay-money/x402@0.3.0':
+    resolution: {integrity: sha512-vKGtpO+nynLiDmFY7Sk/J2UGdFXBbochyMUMBUS5qhE0jLOrv56SQ2zi5QBOHpHrCL+ZPZ6q/PB9pYCHTuYA0A==}
     engines: {node: '>=22.11.0'}
     peerDependencies:
       hono: ^4.6.0
@@ -1439,7 +1440,7 @@ snapshots:
     dependencies:
       '@near-js/crypto': 2.5.1(@near-js/types@2.5.1)(@near-js/utils@2.5.1(@near-js/types@2.5.1))
       '@near-js/transactions': 2.5.1(@near-js/crypto@2.5.1(@near-js/types@2.5.1)(@near-js/utils@2.5.1(@near-js/types@2.5.1)))(@near-js/types@2.5.1)(@near-js/utils@2.5.1(@near-js/types@2.5.1))
-      '@nearpay/spec': 0.4.0(zod@4.6.7)
+      '@nearpay/spec': '@nearpay-money/spec@0.5.0(zod@4.6.7)'
       '@noble/curves': 2.4.0
       '@noble/hashes': 2.4.0
       bs58: 6.0.0
@@ -1450,26 +1451,26 @@ snapshots:
 
   '@nearpay-internal/spec@0.3.1(zod@4.6.7)':
     dependencies:
-      '@nearpay/spec': 0.4.0(zod@4.6.7)
+      '@nearpay/spec': '@nearpay-money/spec@0.5.0(zod@4.6.7)'
       zod: 4.6.7
 
-  '@nearpay/agent-signer@0.1.1(zod@4.6.7)':
+  '@nearpay-money/agent-signer@0.3.0(zod@4.6.7)':
     dependencies:
-      '@nearpay/spec': 0.4.0(zod@4.6.7)
+      '@nearpay-money/spec': 0.5.0(zod@4.6.7)
       '@noble/curves': 2.4.0
       '@noble/hashes': 2.4.0
       bs58: 6.0.0
       canonicalize: 5.1.0
       zod: 4.6.7
 
-  '@nearpay/spec@0.4.0(zod@4.6.7)':
+  '@nearpay-money/spec@0.5.0(zod@4.6.7)':
     dependencies:
       zod: 4.6.7
 
-  '@nearpay/x402@0.1.1(zod@4.6.7)':
+  '@nearpay-money/x402@0.3.0(zod@4.6.7)':
     dependencies:
-      '@nearpay/agent-signer': 0.1.1(zod@4.6.7)
-      '@nearpay/spec': 0.4.0(zod@4.6.7)
+      '@nearpay-money/agent-signer': 0.3.0(zod@4.6.7)
+      '@nearpay-money/spec': 0.5.0(zod@4.6.7)
       zod: 4.6.7
 
   '@noble/curves@1.8.1':

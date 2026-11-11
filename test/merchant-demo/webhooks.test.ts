@@ -5,7 +5,10 @@ import { describe, expect, it } from "vitest";
 import { EventStore, verifyWebhook } from "../../merchant-demo/src/webhooks.js";
 
 const v = JSON.parse(
-  readFileSync(createRequire(import.meta.url).resolve("@nearpay/spec/test-vectors/webhook-signatures.json"), "utf8"),
+  readFileSync(
+    createRequire(import.meta.url).resolve("@nearpay-money/spec/test-vectors/webhook-signatures.json"),
+    "utf8",
+  ),
 );
 const at = (t: number) => ({ now: t * 1000 });
 

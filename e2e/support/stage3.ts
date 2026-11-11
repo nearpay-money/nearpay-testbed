@@ -22,7 +22,7 @@ import {
   InvoiceSecret,
   listSettlementDestinations,
   sendInvoice,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { call } from "../../lib/http.js";
 import { base58Encode, signNep413 } from "../../lib/onboard.js";

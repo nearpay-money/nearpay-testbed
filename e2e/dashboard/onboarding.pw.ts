@@ -10,7 +10,7 @@
  */
 import "../../lib/localhost-dns.js";
 import { randomBytes } from "node:crypto";
-import { nep413Hash } from "@nearpay/agent-signer";
+import { nep413Hash } from "@nearpay-money/agent-signer";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { expect, type Page, test } from "@playwright/test";
 import { serviceOps } from "../../lib/compose.js";

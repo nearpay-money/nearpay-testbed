@@ -5,21 +5,21 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@nearpay/spec': 0.1.4
+  '@nearpay-money/spec': 0.5.0
 
 importers:
 
   .:
     dependencies:
-      '@nearpay/node':
-        specifier: 0.1.0
-        version: 0.1.0(zod@4.6.7)
-      '@nearpay/spec':
-        specifier: 0.1.4
-        version: 0.1.4(zod@4.6.7)
-      '@nearpay/x402':
-        specifier: 0.1.1
-        version: 0.1.1(zod@4.6.7)
+      '@nearpay-money/node':
+        specifier: 0.4.0
+        version: 0.4.0(zod@4.6.7)
+      '@nearpay-money/spec':
+        specifier: 0.5.0
+        version: 0.5.0(zod@4.6.7)
+      '@nearpay-money/x402':
+        specifier: 0.3.0
+        version: 0.3.0(zod@4.6.7)
       express:
         specifier: 5.3.0
         version: 5.3.0
@@ -39,26 +39,26 @@ importers:
 
 packages:
 
-  '@nearpay/agent-signer@0.1.1':
-    resolution: {integrity: sha512-VaGJOoYSZi/4kx78QiUEmA8W5ZglEIJJf1inxN5GpKGM0AnOFM9s7ZD5ehNQajQAubHgtiZ+NiCbwfzjVhew9g==}
+  '@nearpay-money/agent-signer@0.3.0':
+    resolution: {integrity: sha512-nyh0SguJzIhNVL1fqbZxpP0of4yovkDHYlOxCYyq8P4KkXBT74TuwZR4wg7/wVnrx5xeka/oRKPR/yvzel3exQ==}
     engines: {node: '>=22.11.0'}
     peerDependencies:
       zod: ^4.6.7
 
-  '@nearpay/node@0.1.0':
-    resolution: {integrity: sha512-lIEAE70Yc+/9QWSZ7IxGDUqRFMwEYJvMUqd8Kq5THE11CQ1dlvz1iPL+IplSIip+ZZgSk3OHgJdj4foLtcjnhw==}
+  '@nearpay-money/node@0.4.0':
+    resolution: {integrity: sha512-sVLexXBCXzRZmmpAZWVKcqc/dUM+K0MD2gCGpFUvxu/p+dj1yJLKtVsYiCtWwxWoX77Vw02RNL0FFIZtet198w==}
     engines: {node: '>=22.11.0'}
     peerDependencies:
       zod: ^4.6.7
 
-  '@nearpay/spec@0.1.4':
-    resolution: {integrity: sha512-XGwDLXWKb3Q/BC1RybRf0C0TVIllkuytmjzkpRucAp6yCmrGHZq0COOTqRbXIaJMhf6wbCgWDNiIQECdsa/qow==}
+  '@nearpay-money/spec@0.5.0':
+    resolution: {integrity: sha512-hvuwO+DjlZu4PIxQTjYWkZuTeg8pVPEMLTFDHqz7P9h2z/L7U6YNh+O9pI6j/90hnZotkAbVMUb9Rje5YDldQw==}
     engines: {node: '>=22.11.0'}
     peerDependencies:
       zod: ^4.6.7
 
-  '@nearpay/x402@0.1.1':
-    resolution: {integrity: sha512-CZ4CKRidugaU6X6rmf7V2a5jWExxPIZ9KKpFTIP4sCM9joZmv4i8LXcIe0mqokTXGVnx+iAnZKp1fTEaglC9nw==}
+  '@nearpay-money/x402@0.3.0':
+    resolution: {integrity: sha512-vKGtpO+nynLiDmFY7Sk/J2UGdFXBbochyMUMBUS5qhE0jLOrv56SQ2zi5QBOHpHrCL+ZPZ6q/PB9pYCHTuYA0A==}
     engines: {node: '>=22.11.0'}
     peerDependencies:
       hono: ^4.6.0
@@ -383,28 +383,28 @@ packages:
 
 snapshots:
 
-  '@nearpay/agent-signer@0.1.1(zod@4.6.7)':
+  '@nearpay-money/agent-signer@0.3.0(zod@4.6.7)':
     dependencies:
-      '@nearpay/spec': 0.1.4(zod@4.6.7)
+      '@nearpay-money/spec': 0.5.0(zod@4.6.7)
       '@noble/curves': 2.4.0
       '@noble/hashes': 2.4.0
       bs58: 6.0.0
       canonicalize: 5.1.0
       zod: 4.6.7
 
-  '@nearpay/node@0.1.0(zod@4.6.7)':
+  '@nearpay-money/node@0.4.0(zod@4.6.7)':
     dependencies:
-      '@nearpay/spec': 0.1.4(zod@4.6.7)
+      '@nearpay-money/spec': 0.5.0(zod@4.6.7)
       zod: 4.6.7
 
-  '@nearpay/spec@0.1.4(zod@4.6.7)':
+  '@nearpay-money/spec@0.5.0(zod@4.6.7)':
     dependencies:
       zod: 4.6.7
 
-  '@nearpay/x402@0.1.1(zod@4.6.7)':
+  '@nearpay-money/x402@0.3.0(zod@4.6.7)':
     dependencies:
-      '@nearpay/agent-signer': 0.1.1(zod@4.6.7)
-      '@nearpay/spec': 0.1.4(zod@4.6.7)
+      '@nearpay-money/agent-signer': 0.3.0(zod@4.6.7)
+      '@nearpay-money/spec': 0.5.0(zod@4.6.7)
       zod: 4.6.7
 
   '@noble/curves@2.4.0':

@@ -1,6 +1,6 @@
-/** The NearPay merchant calls the demo makes, through `@nearpay/node` (lld/sdks-and-tools.md §1). */
-import { NearPay, NearPayError } from "@nearpay/node";
-import type { CheckoutSession, createCheckoutSession, RouteBody } from "@nearpay/spec";
+/** The NearPay merchant calls the demo makes, through `@nearpay-money/node` (lld/sdks-and-tools.md §1). */
+import { NearPay, NearPayError } from "@nearpay-money/node";
+import type { CheckoutSession, createCheckoutSession, RouteBody } from "@nearpay-money/spec";
 
 export class NearPayApiError extends Error {
   constructor(

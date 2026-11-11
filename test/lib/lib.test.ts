@@ -1,4 +1,4 @@
-import { createPaymentAttempt, getCheckoutSession, x402Supported } from "@nearpay/spec";
+import { createPaymentAttempt, getCheckoutSession, x402Supported } from "@nearpay-money/spec";
 import { describe, expect, it, vi } from "vitest";
 import { composeExecArgs, serviceOps } from "../../lib/compose.js";
 import { ApiError, call, routeUrl } from "../../lib/http.js";

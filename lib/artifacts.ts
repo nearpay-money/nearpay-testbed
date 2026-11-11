@@ -1,6 +1,6 @@
 /**
- * Stage 3 client artifacts the E2E suites run (step 3.4): `@nearpay/cli`, `@nearpay/mcp`, `@nearpay/x402` and
- * `@nearpay/agent-signer` 0.2.0. A package installed here (from the local registry) at the minimum version wins;
+ * Stage 3 client artifacts the E2E suites run (step 3.4): `@nearpay-money/cli`, `@nearpay-money/mcp`, `@nearpay-money/x402` and
+ * `@nearpay-money/agent-signer` 0.2.0. A package installed here (from the local registry) at the minimum version wins;
  * otherwise the build output of the repository's main checkout is used — never its source:
  *
  * | Variable | Default | Used |
@@ -50,7 +50,7 @@ export const AGENTKIT_MIN = "0.2.0";
 
 /** Where a Stage 3 agentkit package is loaded from (an installed package id or a file URL of its dist). */
 export function agentkitEntry(pkg: AgentkitPackage, env: Env = process.env): string {
-  const name = `@nearpay/${pkg}`;
+  const name = `@nearpay-money/${pkg}`;
   const v = installedVersion(name);
   if (v && atLeast(v, AGENTKIT_MIN)) return name;
   const dir = resolve(env.NP_AGENTKIT_DIR ?? join(reposDir(env), "nearpay-agentkit"));
@@ -68,12 +68,12 @@ export async function loadAgentkit<T = any>(pkg: AgentkitPackage, env: Env = pro
   return (await import(agentkitEntry(pkg, env))) as T;
 }
 
-/** `nearpay-mcp` stdio entry (`@nearpay/mcp` bin). */
+/** `nearpay-mcp` stdio entry (`@nearpay-money/mcp` bin). */
 export function mcpBin(env: Env = process.env): string {
   const entry = agentkitEntry("mcp", env);
   if (entry.startsWith("file:")) return join(dirname(fileURLToPath(entry)), "bin.js");
   const req = createRequire(join(testbed, "package.json"));
-  return join(dirname(req.resolve("@nearpay/mcp/package.json")), "dist", "bin.js");
+  return join(dirname(req.resolve("@nearpay-money/mcp/package.json")), "dist", "bin.js");
 }
 
 export const CLI_MIN = "0.1.0";
@@ -81,15 +81,15 @@ export const CLI_MIN = "0.1.0";
 /** `nearpay` CLI entry. */
 export function cliBin(env: Env = process.env): string {
   if (env.NP_CLI_BIN) return resolve(env.NP_CLI_BIN);
-  const v = installedVersion("@nearpay/cli");
+  const v = installedVersion("@nearpay-money/cli");
   if (v && atLeast(v, CLI_MIN)) {
     const req = createRequire(join(testbed, "package.json"));
-    return join(dirname(req.resolve("@nearpay/cli/package.json")), "dist", "cli.js");
+    return join(dirname(req.resolve("@nearpay-money/cli/package.json")), "dist", "cli.js");
   }
   const bin = join(reposDir(env), "nearpay-cli", "dist", "cli.js");
   if (!existsSync(bin)) {
     throw new Error(
-      `@nearpay/cli is neither installed nor built at ${bin} (build nearpay-cli main, or set NP_CLI_BIN)`,
+      `@nearpay-money/cli is neither installed nor built at ${bin} (build nearpay-cli main, or set NP_CLI_BIN)`,
     );
   }
   return bin;

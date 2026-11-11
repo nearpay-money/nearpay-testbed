@@ -1,6 +1,6 @@
 import { createHash, createPublicKey, verify } from "node:crypto";
 import dns from "node:dns";
-import { nep413Hash } from "@nearpay/agent-signer";
+import { nep413Hash } from "@nearpay-money/agent-signer";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { describe, expect, it } from "vitest";
 import { isLocalhostName } from "../../lib/localhost-dns.js";

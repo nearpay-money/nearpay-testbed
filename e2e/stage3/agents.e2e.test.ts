@@ -2,13 +2,13 @@
  * Stage 3 scenario 5 (+6) — agent commerce in the sandbox (development plan §5 step 3.4 "an MCP-driven agent pays a
  * checkout session and a cross-chain x402 resource"; lld/agentpay.md §3.1, lld/sdks-and-tools.md §2):
  *
- * a) `@nearpay/x402` cross-chain: a merchant route behind `withPaywall({origins: [Base USDC]})` (demo merchant key,
+ * a) `@nearpay-money/x402` cross-chain: a merchant route behind `withPaywall({origins: [Base USDC]})` (demo merchant key,
  *    facilitator = the real stack) and an agent `withX402(..., {crossChain})` → 402 → quote (rails route_quote via the
  *    sandbox 1Click) → deposit → settle once rails holds evidence → 200 + `PAYMENT-RESPONSE` → `agent_payment.settled`
  *    (`transfer_method: near-intents`). The test-mode origin signer only reports a deposit tx: the sandbox 1Click
  *    records the deposit when rails submits it (`/v0/deposit/submit`), there is no origin chain to broadcast to.
  *    A failing scenario (amount ending 04) is refused and creates no agent payment (AgentPayment only on `settled`).
- * b) `@nearpay/mcp` (stdio binary, payer tools from the demo agent's sandbox Intents balance): pays a checkout session
+ * b) `@nearpay-money/mcp` (stdio binary, payer tools from the demo agent's sandbox Intents balance): pays a checkout session
  *    and a hosted invoice (`/i/<id>#<secret>`), within the budget and only to the allow-listed merchant; refusals for
  *    a lowered limit and for a merchant that is not on the allow-list.
  * c) the same MCP server embedded with the test-mode origin signer: `nearpay_fetch_paid` pays the cross-chain resource.
@@ -18,7 +18,7 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { createCheckoutSession, getAgentPayment, getCheckoutSession, listAgentPayments } from "@nearpay/spec";
+import { createCheckoutSession, getAgentPayment, getCheckoutSession, listAgentPayments } from "@nearpay-money/spec";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEMO_AGENT_SEED_HEX, USDC } from "../../demo/agent.js";

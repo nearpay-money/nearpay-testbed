@@ -9,6 +9,7 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { verifySigned } from "@nearpay-internal/intents";
 import {
   type AnyRoute,
   agentPay,
@@ -27,8 +28,7 @@ import {
   x402Requirements,
   x402Settle,
   x402Verify,
-} from "@nearpay/spec";
-import { verifySigned } from "@nearpay-internal/intents";
+} from "@nearpay-money/spec";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import canonicalize from "canonicalize";
 

@@ -11,7 +11,7 @@ The demo merchant backend of the Stage 1 demo (`nearpay-brain/roadmap/developmen
 | `GET /orders/:cs_id`        | session + payment intent (status, `amount_settled`, attempts) and the webhook types received for it                                                                                                   |
 | `POST /webhooks`            | verifies `NearPay-Signature` v1 on the raw body (all v1 values, constant time, 300 s), dedupes by event id                                                                                            |
 | `GET /events?type=&object=` | verified events (only when `NP_ENV` is `local`/`test`)                                                                                                                                                |
-| `GET /premium`              | x402 paywall (`@nearpay/x402`), default 10000 base units (0.01 USDC)                                                                                                                                  |
+| `GET /premium`              | x402 paywall (`@nearpay-money/x402`), default 10000 base units (0.01 USDC)                                                                                                                            |
 | `GET /healthz`              | `{status, seeded}`                                                                                                                                                                                    |
 
 ## Configuration
@@ -26,5 +26,5 @@ The demo merchant backend of the Stage 1 demo (`nearpay-brain/roadmap/developmen
 | `NP_DEMO_PREMIUM_AMOUNT`, `NP_DEMO_PREMIUM_ASSET` | `10000`, account default               | x402 price                                                                                                                                                                   |
 | `NP_ENV`, `PORT`                                  | `local`, `3000`                        |                                                                                                                                                                              |
 
-Uses `@nearpay/node` 0.1.0 for the API (automatic Idempotency-Key, retries) and `constructEvent` for webhooks.
+Uses `@nearpay-money/node` 0.1.0 for the API (automatic Idempotency-Key, retries) and `constructEvent` for webhooks.
 Tests live in `../test/merchant-demo/` (run from the repository root).

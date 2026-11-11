@@ -19,7 +19,7 @@ import {
   startKyb,
   submitKyb,
   updateKybProfile,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { describe, expect, it } from "vitest";
 import { base58Encode, signNep413, USDC_NEAR } from "../../lib/onboard.js";

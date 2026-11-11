@@ -8,17 +8,6 @@
  */
 import { randomUUID } from "node:crypto";
 import {
-  API_VERSION,
-  ErrorEnvelope,
-  HEADERS,
-  passkeyRegistrationOptions,
-  passkeyRegistrationVerify,
-  signup,
-  stepUpOptions,
-  stepUpVerify,
-  verifyMagicLink,
-} from "@nearpay/spec";
-import {
   OPS_ROUTES,
   opsEnrolmentVerify,
   opsPasskeyAuthenticationOptions,
@@ -28,6 +17,17 @@ import {
   opsStepUpOptions,
   opsStepUpVerify,
 } from "@nearpay-internal/spec";
+import {
+  API_VERSION,
+  ErrorEnvelope,
+  HEADERS,
+  passkeyRegistrationOptions,
+  passkeyRegistrationVerify,
+  signup,
+  stepUpOptions,
+  stepUpVerify,
+  verifyMagicLink,
+} from "@nearpay-money/spec";
 import { ApiError, routeUrl } from "./http.js";
 import { createCredential, getAssertion, type SoftCredential } from "./webauthn.js";
 

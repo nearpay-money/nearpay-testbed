@@ -8,10 +8,10 @@
  *   GET  /success          return page (`?session_id=`)
  *   POST /webhooks         signed webhook deliveries (NearPay-Signature v1 verified on the raw body)
  *   GET  /events           verified events received (local/test only; for demo:checkout / demo:agent / E2E)
- *   GET  /premium          paid resource behind the x402 paywall (`@nearpay/x402`)
+ *   GET  /premium          paid resource behind the x402 paywall (`@nearpay-money/x402`)
  *   GET  /healthz          liveness
  */
-import { createPaywall, type PaidRequest, type Paywall } from "@nearpay/x402";
+import { createPaywall, type PaidRequest, type Paywall } from "@nearpay-money/x402";
 import express, { type Express, type Request, type Response } from "express";
 import type { Config } from "./config.js";
 import { NearPayApiError, type NearPayClient, nearpayClient } from "./nearpay.js";

@@ -15,7 +15,7 @@ import {
   HEADERS,
   markInvoiceUncollectible,
   voidInvoice,
-} from "@nearpay/spec";
+} from "@nearpay-money/spec";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ApiError, call, routeUrl } from "../../lib/http.js";
 import { md, realStack, stack, WEBHOOK_TIMEOUT_MS } from "../support/env.js";

@@ -8,7 +8,7 @@
  * forwarded event is checked against its HMAC signature. refund.failed (refund amount ending 04) is checked not to be
  * claimed: scenario 04 holds the refund leg (see below).
  *
- * The CLI binary comes from lib/artifacts.ts (`@nearpay/cli` when installed, else nearpay-cli's build output).
+ * The CLI binary comes from lib/artifacts.ts (`@nearpay-money/cli` when installed, else nearpay-cli's build output).
  */
 import "../../lib/localhost-dns.js";
 import { type ChildProcess, spawn } from "node:child_process";
@@ -18,7 +18,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getAccount } from "@nearpay/spec";
+import { getAccount } from "@nearpay-money/spec";
 import { expect, type Page, test } from "@playwright/test";
 import { cliBin, nodeArgs } from "../../lib/artifacts.js";
 import type { SoftCredential } from "../../lib/webauthn.js";

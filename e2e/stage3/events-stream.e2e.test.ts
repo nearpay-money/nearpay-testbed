@@ -5,7 +5,7 @@
  * exactly the missed events, in order, then live again; `starting_after` resumes the same way; unknown types are
  * refused. Streamed events are the objects `GET /v1/events/{id}` returns.
  */
-import { getEvent } from "@nearpay/spec";
+import { getEvent } from "@nearpay-money/spec";
 import { beforeAll, describe, expect, it } from "vitest";
 import { openEventStream, type StreamEvent } from "../../lib/sse.js";
 import { realStack, stack } from "../support/env.js";
