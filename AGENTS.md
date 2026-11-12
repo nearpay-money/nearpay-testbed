@@ -1,6 +1,6 @@
 # AGENTS.md — nearpay-testbed
 
-You are working in **nearpay-testbed**, one of 27 NearPay repositories (`nearpay-brain/architecture/repositories.md`).
+You are working in **nearpay-testbed**, one of 26 NearPay repositories (`nearpay-brain/architecture/repositories.md`).
 Scope: Whole-system verification and demos: merchant-demo app, demo scripts (checkout, agent), Stage 1 ops CLI, cross-service E2E, consumer-driven contract tests, load tests (k6), chaos scenarios, mainnet canary runner, recorded provider fixtures.
 
 ## Before changing anything

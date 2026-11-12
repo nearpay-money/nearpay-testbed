@@ -1,6 +1,11 @@
 # nearpay-testbed
 
-> Whole-system verification and demos: merchant-demo app, demo scripts (checkout, agent), Stage 1 ops CLI, cross-service E2E, consumer-driven contract tests, load tests (k6), chaos scenarios, mainnet canary runner, recorded provider fixtures.
+Whole-system verification and demos: the merchant-demo app, demo scripts (checkout, agent), an ops CLI wrapper for local stacks and the cross-service end-to-end suites (Stages 1–4).
+
+Part of [NearPay](https://github.com/nearpay-money/nearpay) — start there for the live demo, the architecture diagram and the full "do X, see Y" walkthrough.
+
+- **Where it sits:** outside the product. It drives a running NearPay stack (the Compose stack from `nearpay-deploy`) the way a merchant, a payer, an agent and an operator would, using only published artifacts: the public API, `@nearpay-money/node`, `@nearpay-money/x402`, `@nearpay-money/agent-signer`, the CLI and the browser apps.
+- **Status:** NearPay runs on NEAR mainnet as a closed beta (https://nearpay.money). The suites here run against a local stack in test mode; the "Mainnet demo" section below is the self-hosted variant of the live walkthrough in the entry repo. The load tests, chaos scenarios, canary runner, consumer-driven contract tests and recorded provider fixtures named in the design are not built: `load/`, `chaos/`, `canary/`, `contract-tests/`, `compose/`, `fixtures/near/` and `fixtures/oneclick/` are empty placeholders.
 
 |                                       |                         |
 | ------------------------------------- | ----------------------- |
@@ -13,35 +18,48 @@
 
 ## Documentation
 
-This repo stays surgical: design docs live in [`nearpay-brain`](../nearpay-brain/README.md), not here.
+Design docs live in [`nearpay-brain`](https://github.com/nearpay-money/nearpay-brain), not here.
 
-- `nearpay-brain/lld/platform.md` — **low-level design (dev-ready; implement from this)**
-- `nearpay-brain/lld/audits/platform.md` — audit findings already folded into the LLD
-- `nearpay-brain/roadmap/development-plan.md` — stage and step this repo is built in
-- `nearpay-brain/architecture/hld.md` — system design
-- `nearpay-brain/architecture/repositories.md` — repo topology and dependency rules
-- `nearpay-brain/quality/stress-test.md`
-- `nearpay-brain/quality/capacity.md`
+- [`lld/platform.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/lld/platform.md) — low-level design this repo is implemented from
+- [`lld/audits/platform.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/lld/audits/platform.md) — audit findings already folded into the LLD
+- [`roadmap/development-plan.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/roadmap/development-plan.md) — stage and step this repo is built in
+- [`architecture/hld.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/architecture/hld.md) — system design
+- [`architecture/repositories.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/architecture/repositories.md) — repo topology and dependency rules
+- [`quality/stress-test.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/quality/stress-test.md)
+- [`quality/capacity.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/quality/capacity.md)
 
-## Layout (Stage 1)
+## Layout
 
 ```
 nearpay-testbed/
 ├── merchant-demo/      demo merchant (own package + Dockerfile; image nearpay/merchant-demo:local) — see its README
 ├── demo/               checkout.ts (pnpm demo:checkout, demo steps 2–4), agent.ts (pnpm demo:agent, step 5)
-├── ops/                Stage 1 ops CLI (pnpm ops …): KYB decision, kill switch, cool-off skip → docker compose exec
+├── ops/                ops CLI for local stacks (pnpm ops …): operators, KYB decision (manual mode), kill switch, cool-off skip → docker compose exec
 ├── scripts/            onboard-live.ts (pnpm onboard:live): live demo merchant onboarding in Chrome (step 1.5)
 ├── lib/                spec-route HTTP client, stack locations, merchant-demo client, scripted payers, scenarios 00–07
-├── e2e/                full-stack suites for step 1.4: api/ (T1, T2/T6, T7, scenarios), agent/ (T4, T5), checkout/ (T3, hosted UI)
+├── e2e/                full-stack suites: api/ (T1, T2/T6, T7, scenarios), agent/ (T4, T5), checkout/ (T3, hosted UI), dashboard/, stage2/, stage3/, stage4/
 ├── test/               unit + mock-backed tests (mock stack: spec-validated fake API, sentinel test key, webhooks)
-├── canary/ chaos/ load/ contract-tests/ fixtures/ compose/   later steps
+├── fixtures/           the synthetic OFAC list (ofac/); near/ and oneclick/ are empty
+├── canary/ chaos/ load/ contract-tests/ compose/   empty placeholders (not built)
 └── .github/
 ```
+
+## Verify this repo
+
+Needs Node 22, pnpm 9 and, for step 4, Google Chrome. Steps 1–4 need no Docker and no running stack. `.npmrc` points the `@nearpay-money` and `@nearpay-internal` scopes at a local package registry, so start that first.
+
+1. Start the local registry (no Docker, Node 22 only):
+   `git clone https://github.com/nearpay-money/nearpay-deploy ../nearpay-deploy && ../nearpay-deploy/scripts/registry.sh start`
+   → `curl http://127.0.0.1:4873/-/ping` answers `{}`.
+2. `pnpm run setup` (installs the root package and `merchant-demo/`) → both installs end with `Done in …`. Type `pnpm run setup`, not `pnpm setup`: the bare form is pnpm's own command, which edits your shell profile and installs nothing here.
+3. `pnpm test` (unit tests and tests against a mock stack: a spec-validated fake API, a sentinel test key, webhooks) → `Test Files  11 passed (11)`, `Tests  125 passed (125)`. If step 2 was skipped, four files fail with `Failed to load url @nearpay-money/node`.
+4. `pnpm verify` (the gate: typecheck, lint, the same tests with the coverage gate, the mock-backed Playwright tests in the system Chrome, build of merchant-demo) → exits 0; the Playwright list ends with `2 passed`.
+5. The full-stack suites (`pnpm test:e2e`, `NP_E2E=1 pnpm test:pw`) need Docker and a running stack from `nearpay-deploy`; see "E2E" below. They are not part of `pnpm verify`.
 
 ## Setup
 
 ```sh
-pnpm setup            # root + merchant-demo installs (@nearpay-money/* from the local registry)
+pnpm run setup        # root + merchant-demo installs (@nearpay-money/* from the local registry)
 pnpm verify           # typecheck, lint, unit + mock-backed tests (coverage gate), Playwright (system Chrome), build
 ```
 
@@ -77,14 +95,18 @@ pnpm ops operator-revoke ops@example.test
 pnpm ops sanctions-import                      # offline stacks: loads the synthetic OFAC list (fixtures/ofac)
 ```
 
-Stage 1 commands (drills, local stacks):
+Drill commands (local stacks):
 
 ```sh
 pnpm ops kyb-decide acct_… approved --reason "documents checked"   # only with NP_KYB_MODE=manual (ADR-0024)
 pnpm ops kill-switch
 pnpm ops kill-switch-release "false alarm, quote re-checked" --yes
-pnpm ops destination-cooloff-skip sd_…
+pnpm ops destination-cooloff-skip sd_…                             # only on a stack with NP_COOLOFF_SECONDS > 0 (ADR-0027)
 ```
+
+Payout wallets have no cool-off by default (ADR-0027) and the beta runs with `NP_COOLOFF_SECONDS=0`;
+`nearpay-deploy`'s `compose/env/local.env` still sets 24 h, which is what the skip command and the T1 browser
+test exercise.
 
 Each runs `docker compose -p nearpay … exec -T <svc>-api /nodejs/bin/node dist/ops.js …` with
 `nearpay-deploy`'s files (`--deploy <dir>` or `NP_DEPLOY_DIR`); there is no network path to these actions.
@@ -154,7 +176,9 @@ WebAuthn needs. The scripted payer asks sentinel again (up to 4 tries) while it 
 
 ## Mainnet demo
 
-Step 1.5 runs the Stage 1 demo script (`nearpay-brain/roadmap/development-plan.md` §3) on mainnet, using the
+NearPay itself now runs on mainnet at https://nearpay.money; to try that deployment follow the
+[entry repo](https://github.com/nearpay-money/nearpay). This section is the self-hosted variant: it runs the Stage 1
+demo script ([`roadmap/development-plan.md`](https://github.com/nearpay-money/nearpay-brain/blob/main/roadmap/development-plan.md) §3) on mainnet, using your own
 local Compose stack in live mode. Use small amounts. **You sign every transaction yourself**: nothing in
 NearPay holds a payer's or a merchant's keys.
 
@@ -215,7 +239,7 @@ export NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem   # Node trusts
      from Mailpit, then a passkey in Chrome's virtual authenticator. The passkey, private key included, is saved
      to `.secrets/accounts/merchant-passkey.json` (0600); later runs sign in with it;
    - adds a live USDC NEAR Intents destination for the key's account and signs the NEP-413 attestation with
-     that key, so payouts go to it; then skips the cool-off and submits self-declared business details
+     that key, so payouts go to it; then skips the cool-off when the stack has one (`NP_COOLOFF_SECONDS` > 0) and submits self-declared business details
      (`--country`, default GB; no registration number) — compliance decides at once (open onboarding,
      ADR-0024). Only `--kyb-mode manual` (stack on `NP_KYB_MODE=manual`) approves KYB through the ops CLI;
    - creates a live secret key and writes it to `.secrets/merchant-demo/secret_key`;
@@ -234,7 +258,7 @@ export NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem   # Node trusts
    - Then run, from this repo:
 
      ```sh
-     pnpm ops destination-cooloff-skip sd_…                       # or wait NP_COOLOFF_SECONDS
+     pnpm ops destination-cooloff-skip sd_…                       # only when the stack sets NP_COOLOFF_SECONDS > 0
      # only when compliance runs NP_KYB_MODE=manual:
      pnpm ops kyb-decide acct_… approved --reason "demo merchant"
      ```
@@ -243,7 +267,7 @@ export NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem   # Node trusts
      - add a live webhook endpoint `http://merchant-demo:3000/webhooks` (allowed only while `NP_ENV=local`) and append its signing secret to `.secrets/merchant-demo/webhook_secret`, comma-separated.
    - merchant-demo re-reads both files within 5 s.
 2. **Checkout session.** Run `pnpm demo:checkout`. It prints a live hosted-checkout URL (USD 2.00).
-3. **Payer pays.** Open the URL. Check the sentinel-verified merchant name and destination fingerprint. Connect the EVM wallet, choose USDC on Base, and pay.
+3. **Payer pays.** Open the URL. Check the merchant name and the destination fingerprint (checkout shows payment instructions only after sentinel's co-signature verifies). Connect the EVM wallet, choose USDC on Base, and pay.
 4. **Settlement.** Within about 1–2 minutes the merchant's Intents balance shows 2.00 USDC. `demo:checkout` prints `payment_intent.succeeded`, verified by merchant-demo. The dashboard payment page links the on-chain evidence.
 5. **Agent payment.** Run:
 
@@ -257,18 +281,26 @@ export NODE_EXTRA_CA_CERTS=../nearpay-deploy/.secrets/tls/ca.pem   # Node trusts
 
 - Live keys and `.secrets/` never leave your machine and are never committed.
 - `pnpm ops kill-switch-engage <reason>` pauses rails and agentpay at once if anything looks wrong (`pnpm ops kill-switch` shows the state).
-- A sentinel `security` refusal of a live address engages the switch and live payments stop. Once checked, resume with
-  `pnpm ops kill-switch-release "<what was checked>" --yes`.
+- A sentinel integrity refusal on one payment quarantines that merchant for 30 minutes by default; other merchants keep
+  working. Sentinel engages the global kill switch itself only on corroborated refusals across merchants (ADR-0028). After
+  an engaged switch has been checked, resume with `pnpm ops kill-switch-release "<what was checked>" --yes` (local stacks).
 - Stop with `scripts/down.sh` in nearpay-deploy.
 
 ## Status
 
 Step 1.3: merchant-demo, demo scripts, Stage 1 ops CLI and E2E scaffolding with unit + mock-backed
 tests. Step 1.4: every suite above green against the full Compose stack in test mode (traces T1–T7,
-sandbox scenarios 00–07).
+sandbox scenarios 00–07). Later steps added the Stage 2 (refunds, payment links, reconciliation, console), Stage 3
+(invoices, subscriptions, events stream, agents, CLI) and Stage 4 (mandates on the sandbox vault stand-in, Solana and
+Bitcoin) suites listed above, and the open-onboarding flow (ADR-0024). Current pins (`package.json`):
+`@nearpay-money/spec` 0.5.0, `@nearpay-money/x402` and `@nearpay-money/agent-signer` 0.3.0, `@nearpay-money/node` 0.4.0.
 
 ## Built with
 
-Libraries (hackathon rule Q-005): Express, zod, `@nearpay-money/spec`, `@nearpay-money/node`, `@nearpay-money/x402`, `@nearpay-money/agent-signer`;
-development — TypeScript, Vitest, Playwright, Biome, tsx, `@noble/curves`, canonicalize. Code and
-documentation are written with AI assistance (Claude) under human direction and review.
+- Runtime: Express (merchant-demo), zod, `@nearpay-money/spec`, `@nearpay-money/node`, `@nearpay-money/x402`,
+  `@nearpay-money/agent-signer`.
+- Development: TypeScript, Vitest, Playwright, Biome, tsx, `@noble/curves`, canonicalize, `@nearpay-internal/intents`
+  and `@nearpay-internal/spec` (scripted payers and event checks).
+- Licence: Apache-2.0 (`LICENSE`).
+
+Code and documentation are written with AI assistance (Claude) under human direction and review. Built for the NEAR Hackathon (Nov 2026).
