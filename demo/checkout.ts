@@ -63,7 +63,7 @@ export async function runCheckoutDemo(
         ...(deps.fetch ? { fetch: deps.fetch } : {}),
       });
       log(
-        `    attested merchant: ${paid.merchant.name}${paid.merchant.kyb_verified ? " (KYB verified)" : ""}  destination ${paid.fingerprint}`,
+        `    attested merchant: ${paid.merchant.name}${paid.merchant.kyb_verified ? " (business details declared)" : ""}  destination ${paid.fingerprint}`,
       );
       log(
         `    deposit ${paid.attempt.deposit?.amount_in} → ${paid.attempt.deposit?.address} on ${paid.attempt.deposit?.chain} (simulated)`,

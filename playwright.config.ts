@@ -14,6 +14,8 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   timeout: 60_000,
+  // full stack: load the synthetic OFAC list on an offline stack (as the Vitest E2E setup does)
+  ...(stack ? { globalSetup: "./e2e/support/pw-global-setup.ts" } : {}),
   // NP_E2E=1 runs the full-stack project only (the mock project needs the mock server below)
   projects: stack
     ? [
