@@ -11,6 +11,7 @@
  * Options: --amount <cents> (test mode; sandbox scenario = last two digits), --no-pay (only create
  * and wait), --timeout <s> (default 120 test / 900 live). Stack locations: lib/stack.ts.
  */
+import "../lib/localhost-dns.js"; // *.localhost → loopback: glibc without nss-myhostname does not resolve these names
 import { parseArgs } from "node:util";
 import { merchantDemo } from "../lib/merchant-demo.js";
 import { payBySimulatedDeposit, sessionFromUrl } from "../lib/payer.js";
