@@ -1,12 +1,14 @@
 /**
  * Stage 3 scenario 1, browser half (NP_E2E=1): the customer opens the hosted invoice `/i/:id#<secret>` from the
  * `invoice.issued` link → invoice document (test banner, total incl. 19 % VAT) → "Pay" opens the invoice's checkout
- * session in place → manual path, USDC on Base → sentinel-verified merchant + fingerprint → network confirmation →
+ * session in place → manual path → "Pay with": network Base, token USDC, Continue → refund address →
+ * sentinel-verified merchant + fingerprint → network confirmation →
  * "Simulate payment" → "View invoice" shows it paid → the receipt PDF downloads stamped PAID; the gateway serves the
  * page with `Referrer-Policy: no-referrer` (the path names the invoice). Selectors are nearpay-checkout's test ids.
  */
 import "../../lib/localhost-dns.js";
 import { expect, test } from "@playwright/test";
+import { BASE_CHAIN, choosePayWith } from "../support/checkout-ui.js";
 import { md, WEBHOOK_TIMEOUT_MS } from "../support/env.js";
 import { catalogue, customerMail, getInv, hostedLinkIn, sentInvoice, USDC_BASE } from "../support/stage3.js";
 
@@ -39,10 +41,12 @@ test("hosted invoice /i/:id: pay from Base in test mode, invoice paid, receipt P
 
   await page.getByTestId("invoice-pay").click();
   await page.getByTestId("path-manual").click({ timeout: 30_000 });
-  await page.getByTestId(`option-route_quote-${USDC_BASE}`).click();
+  await choosePayWith(page, { chain: BASE_CHAIN, method: "route_quote", asset: USDC_BASE });
+  await expect(page.getByTestId("refund-form")).toBeVisible();
   await page.getByTestId("refund-address").fill(REFUND);
   await page.getByTestId("continue").click();
-  await page.getByTestId("payment-details").click({ timeout: 30_000 });
+  await expect(page.getByTestId("manual-instructions")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("payment-details").click();
   await expect(page.getByTestId("merchant-name")).not.toBeEmpty();
   await expect(page.getByTestId("fingerprint")).toHaveText(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{2}$/);
   await page.keyboard.press("Escape");

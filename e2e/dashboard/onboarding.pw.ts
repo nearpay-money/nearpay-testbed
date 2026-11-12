@@ -1,12 +1,18 @@
 /**
  * T1 — merchant onboarding through the real dashboard (lld/audits/system.md §3, NP_E2E=1):
  * passkey sign-up (Turnstile) → magic link from Mailpit (notify) → passkey registration (CDP virtual
- * authenticator, like nearpay-dashboard's own suite) → live NEAR Intents destination → NEP-413
+ * authenticator, like nearpay-dashboard's own suite) → live payout wallet (NEAR Intents account) → NEP-413
  * attestation signed by a real key of a fresh implicit account (identity §8.2: hex(pubkey) == address,
- * no RPC) → cool-off (Stage 1 ops CLI skip; local.env keeps 24 h) → `activated` (security email) →
+ * no RPC) → the wallet is active at once ("Payout wallet active"; ADR-0027: `NP_COOLOFF_SECONDS=0` is
+ * identity's default and what nearpay-deploy's local.env.example sets) → `activated` (security email) →
  * business details saved (no registration number) → compliance decides at once (NP_KYB_MODE=auto,
- * ADR-0024; no ops step) → account live. With NP_KYB_MODE=manual on the stack, the trace keeps the
- * Stage 1 ops CLI decision.
+ * ADR-0024; no ops step) → account live. A stack whose operator sets a cool-off > 0 shows the wallet as
+ * "Activating"; only then the trace ends the cool-off with the ops CLI (`destination-cooloff-skip`, which
+ * identity refuses for any other status). With NP_KYB_MODE=manual on the stack, the trace keeps the Stage 1
+ * ops CLI decision.
+ *
+ * Selectors follow nearpay-dashboard's own suite (test/e2e/onboarding.spec.ts, src/features/kyb/kyb.e2e.ts)
+ * after the 2026-11-12 redesign: "Payout wallets" instead of "destinations", a Live / Test radio group.
  */
 import "../../lib/localhost-dns.js";
 import { randomBytes } from "node:crypto";
@@ -14,6 +20,7 @@ import { nep413Hash } from "@nearpay-money/agent-signer";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { expect, type Page, test } from "@playwright/test";
 import { serviceOps } from "../../lib/compose.js";
+import { destinationInAccountShow, ensureDestinationActive } from "../../lib/destinations.js";
 import { stackFromEnv } from "../../lib/stack.js";
 import { runCli } from "../../ops/cli.js";
 
@@ -136,7 +143,7 @@ async function setUp(page: Page, near: { accountId: string; publicKey: string; s
   );
 }
 
-test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413, cool-off, KYB → live", async ({
+test("T1 onboarding: sign-up, magic link, passkey, live payout wallet with NEP-413, active, KYB → live", async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -170,16 +177,16 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
   const account = /"(acct_[0-9a-z]{26})"/.exec(JSON.stringify(shown.json))?.[1] as string;
   expect(account).toBeTruthy();
 
-  // live destination: NEP-413 challenge signed by the destination account's key (Stage 2 dashboard: mode switch,
-  // "Add a destination" form, wallet verification in one step)
-  await page.getByRole("switch", { name: "Live mode" }).click();
+  // live payout wallet: NEP-413 challenge signed by the wallet account's key (mode switch = Live / Test radio
+  // group, "Add a payout wallet" form, wallet verification in one step)
+  await page.getByTestId("mode-switch").getByRole("radio", { name: "Live", exact: true }).click();
   await expect(page).toHaveURL(/mode=live/);
   await page.goto(`${st.dashboardUrl}/settlement/new?mode=live`);
-  await expect(page.getByRole("heading", { name: "Add a destination" })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Add a payout wallet" })).toBeVisible({ timeout: 30_000 });
+  await page.getByLabel("Wallet name").fill("Live USDC (T1)");
   await page.getByLabel("Currency").selectOption("USDC");
   await page.getByLabel("Network", { exact: true }).selectOption(USDC_NEAR);
   await page.getByLabel("NEAR Intents account", { exact: true }).fill(near.accountId);
-  await page.getByLabel("Destination name").fill("Live USDC (T1)");
   await page.getByRole("button", { name: "Connect wallet & verify" }).click();
   const stepUp = page.getByRole("dialog", { name: "Confirm it's you" });
   const challenge = page.getByTestId("challenge-message");
@@ -187,35 +194,58 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
   if (await stepUp.isVisible()) await page.getByRole("button", { name: "Confirm with passkey" }).click();
   await expect(challenge).toContainText(`Address: ${near.accountId}`, { timeout: 30_000 });
   await expect(challenge).toContainText(`Account: ${account}`);
-  await page.getByRole("button", { name: "Sign with NEAR wallet" }).click();
+  await page.getByRole("button", { name: "Connect NEAR wallet" }).click();
   await page.locator('.connect-item[data-type="test-near-wallet"]').click();
-  await expect(page.getByText("Signature verified.")).toBeVisible({ timeout: 30_000 });
+  // the signature verified: "Payout wallet active" (no cool-off, the default) or, on a stack with a cool-off,
+  // "Signature verified." with the activating line
+  const activeNote = page.getByText("Payout wallet active", { exact: true });
+  const activatingNote = page.getByText("Activating. It can receive payments once it shows as active.");
+  await expect(activeNote.or(activatingNote)).toBeVisible({ timeout: 30_000 });
   const fingerprint = (await page
     .getByText(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{2}$/)
     .first()
     .textContent()) as string;
 
-  // cooling off (24 h in local.env) → the Stage 1 ops CLI skip → activated
-  await page.getByRole("link", { name: "Back to destinations" }).click();
-  await expect(page.getByTestId("cooloff")).toContainText(/activates in/i);
-  const destinations = ops("identity-api", ["account-show", account]);
-  const sd = new RegExp(`"(sd_[0-9a-z]{26})"[^}]*${near.accountId}|${near.accountId}[^}]*"(sd_[0-9a-z]{26})"`).exec(
-    JSON.stringify(destinations.json),
-  );
-  const destination = (sd?.[1] ?? sd?.[2]) as string;
-  expect(destination, JSON.stringify(destinations.json).slice(0, 500)).toBeTruthy();
-  expect(runCli(["destination-cooloff-skip", destination], { deployDir: st.deployDir, out: () => {} })).toBe(0);
-  await expect
-    .poll(
-      async () => {
-        await page.reload();
-        return page.getByTestId("destinations-table").textContent();
-      },
-      { timeout: 60_000, intervals: [2000] },
-    )
-    .toMatch(/active/i);
-  await expect(page.getByTestId("destinations-table")).toContainText(fingerprint);
-  await mail(page, email, /destination/i); // notify's security email on activation
+  // identity's view of the wallet: active at once without a cool-off; with one, the ops CLI ends it
+  const destinationNow = () =>
+    destinationInAccountShow(ops("identity-api", ["account-show", account]).json, near.accountId);
+  const dest = destinationNow();
+  expect(dest, `live destination ${near.accountId} in account-show`).toBeTruthy();
+  const destination = (dest as { id: string }).id;
+  expect(dest).toMatchObject({ livemode: true });
+  const cooling = dest?.status === "cooling_off";
+  if (cooling) await expect(activatingNote).toBeVisible();
+  else {
+    expect(dest?.status).toBe("active");
+    await expect(activeNote).toBeVisible();
+    await expect(page.getByText("Signature verified. Live payments can settle to this wallet now.")).toBeVisible();
+  }
+  const { skipped } = await ensureDestinationActive({
+    id: destination,
+    status: async () => destinationNow()?.status,
+    skipCooloff: () => ({
+      code: runCli(["destination-cooloff-skip", destination], { deployDir: st.deployDir, out: () => {} }),
+      stdout: "",
+      stderr: "see the ops CLI output above",
+    }),
+    timeoutMs: 60_000,
+  });
+  expect(skipped).toBe(cooling);
+
+  // the payout wallets list shows it as Active (status badge), with the same fingerprint
+  await page.getByRole("link", { name: "Back to payout wallets" }).click();
+  await expect(page.getByRole("heading", { name: "Payout wallets", exact: true })).toBeVisible();
+  const row = page
+    .getByTestId("destinations-table")
+    .locator("tr", { has: page.getByTestId(`destination-${destination}`) });
+  await expect(async () => {
+    if (!(await row.getByText("Active", { exact: true }).isVisible())) await page.reload();
+    await expect(row.getByText("Active", { exact: true })).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 60_000 });
+  await expect(row.getByTestId("activating")).toHaveCount(0);
+  await expect(row).toContainText("Live USDC (T1)");
+  await expect(row).toContainText(fingerprint);
+  await mail(page, email, /settlement destination is now active/i); // notify's security email on activation
 
   // self-declared business details (Settings → Business details, ADR-0020 d3) → automatic decision
   // (open onboarding, ADR-0024) → identity live_enabled. Manual review mode keeps the ops CLI decision.
@@ -232,8 +262,10 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
   await page.getByLabel("Role").fill("Director");
   await page.getByTestId("kyb-declaration").check();
   await page.getByTestId("kyb-submit").click();
-  if (await stepUp.isVisible({ timeout: 5_000 }).catch(() => false))
-    await page.getByRole("button", { name: "Confirm with passkey" }).click();
+  // submitKyb needs a fresh step-up: the dialog appears unless the wallet step's confirmation still holds (10 min)
+  const kybStatus = page.getByTestId("kyb-status");
+  await expect(stepUp.or(kybStatus)).toBeVisible({ timeout: 30_000 });
+  if (await stepUp.isVisible()) await page.getByRole("button", { name: "Confirm with passkey" }).click();
   if (process.env.NP_KYB_MODE === "manual") {
     await expect
       .poll(() => JSON.stringify(ops("compliance-api", ["kyb-show", account]).json), { timeout: 30_000 })
@@ -242,9 +274,7 @@ test("T1 onboarding: sign-up, magic link, passkey, live destination with NEP-413
       runCli(["kyb-decide", account, "approved", "--reason", "testbed T1"], { deployDir: st.deployDir, out: () => {} }),
     ).toBe(0);
   } else {
-    await expect(page.getByTestId("kyb-status")).toContainText("You're live — you can accept real payments", {
-      timeout: 30_000,
-    });
+    await expect(kybStatus).toContainText("You're live — you can accept real payments", { timeout: 30_000 });
     const kyb = JSON.stringify(ops("compliance-api", ["kyb-show", account]).json);
     expect(kyb).toMatch(/"status":\s*"approved"/);
     expect(kyb).toMatch(/"decided_by":\s*"system"/);

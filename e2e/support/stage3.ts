@@ -24,6 +24,7 @@ import {
   sendInvoice,
 } from "@nearpay-money/spec";
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { ensureDestinationActive } from "../../lib/destinations.js";
 import { call } from "../../lib/http.js";
 import { base58Encode, signNep413 } from "../../lib/onboard.js";
 import { DashboardSession } from "../../lib/ops-console.js";
@@ -252,17 +253,12 @@ export async function newMerchant(
       body: { challenge_id: ch.id, standard: "nep413", ...signNep413(key, ch) },
     });
   }
-  const now = await session.call<{ status: string }>(getSettlementDestination, { params: { id: d.id } });
-  if (now.status !== "active") {
-    const skip = ops("identity-api", ["destination-cooloff-skip", d.id, "--actor", "testbed:e2e"]);
-    if (skip.code !== 0) throw new Error(`destination-cooloff-skip ${d.id}: ${skip.stderr || skip.stdout}`);
-  }
-  await until(
-    () => session.call<{ status: string }>(getSettlementDestination, { params: { id: d.id } }),
-    (x) => x.status === "active",
-    30_000,
-    `${d.id} active`,
-  );
+  await ensureDestinationActive({
+    id: d.id,
+    status: async () =>
+      (await session.call<{ status: string }>(getSettlementDestination, { params: { id: d.id } })).status,
+    skipCooloff: () => ops("identity-api", ["destination-cooloff-skip", d.id, "--actor", "testbed:e2e"]),
+  });
   return { session, email, destination: d.id };
 }
 

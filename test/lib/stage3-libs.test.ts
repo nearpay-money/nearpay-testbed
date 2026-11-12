@@ -1,5 +1,5 @@
 /** Unit tests of the Stage 3 E2E support code: SSE parsing/consumer, MCP client transports, artifact resolution. */
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -9,6 +9,7 @@ import {
   AGENTKIT_MIN,
   agentkitEntry,
   atLeast,
+  CLI_MIN,
   cliBin,
   installedVersion,
   loadAgentkit,
@@ -169,26 +170,36 @@ describe("artifacts", () => {
     expect(installedVersion("@nearpay-money/does-not-exist")).toBeNull();
     const repos = mkdtempSync(join(tmpdir(), "np-repos-"));
     expect(reposDir({ NP_REPOS_DIR: repos })).toBe(repos);
-    expect(() => agentkitEntry("mcp", { NP_REPOS_DIR: repos })).toThrow(/neither installed nor built/);
-    expect(() => cliBin({ NP_REPOS_DIR: repos })).toThrow(/neither installed nor built/);
+    const env = { NP_REPOS_DIR: repos };
+
+    // every Stage 3 client is installed here (published packages), so nothing is needed from sibling repositories
+    for (const pkg of ["x402", "agent-signer", "mcp"] as const) {
+      expect(atLeast(installedVersion(`@nearpay-money/${pkg}`) ?? "0.0.0", AGENTKIT_MIN)).toBe(true);
+      expect(agentkitEntry(pkg, env)).toBe(`@nearpay-money/${pkg}`);
+    }
+    expect(mcpBin(env)).toMatch(/@nearpay-money\/mcp\/dist\/bin\.js$/);
+    expect(existsSync(mcpBin(env))).toBe(true);
+    expect(atLeast(installedVersion("@nearpay-money/cli") ?? "0.0.0", CLI_MIN)).toBe(true);
+    expect(cliBin(env)).toMatch(/@nearpay-money\/cli\/dist\/cli\.js$/);
+    expect(existsSync(cliBin(env))).toBe(true);
+    expect(typeof (await loadAgentkit("mcp", env)).createNearPayMcpServer).toBe("function");
     expect(cliBin({ NP_CLI_BIN: "/x/cli.js" })).toBe("/x/cli.js");
 
+    // fallback (a package missing or older than the minimum): the sibling repository's build output, never its source
+    const none = () => null;
+    const old = () => "0.1.0";
+    expect(() => agentkitEntry("mcp", env, none)).toThrow(/neither installed nor built/);
+    expect(() => cliBin(env, none)).toThrow(/neither installed nor built/);
     for (const pkg of ["mcp", "x402"]) {
       mkdirSync(join(repos, "nearpay-agentkit/packages", pkg, "dist"), { recursive: true });
       writeFileSync(join(repos, "nearpay-agentkit/packages", pkg, "dist/index.js"), `export const name = "${pkg}";`);
     }
     mkdirSync(join(repos, "nearpay-cli/dist"), { recursive: true });
     writeFileSync(join(repos, "nearpay-cli/dist/cli.js"), "");
-    const env = { NP_REPOS_DIR: repos };
-    // the installed @nearpay-money/x402 (0.3.x) meets the Stage 3 minimum, so the package wins over build output
-    expect(atLeast(installedVersion("@nearpay-money/x402") ?? "0.0.0", AGENTKIT_MIN)).toBe(true);
-    expect(agentkitEntry("x402", env)).toBe("@nearpay-money/x402");
-    // @nearpay-money/mcp is not installed here, so the repository build output is used
-    expect(installedVersion("@nearpay-money/mcp")).toBeNull();
-    expect(agentkitEntry("mcp", env)).toMatch(/^file:.*packages\/mcp\/dist\/index\.js$/);
-    expect((await loadAgentkit("mcp", env)).name).toBe("mcp");
-    expect(mcpBin(env)).toBe(join(repos, "nearpay-agentkit/packages/mcp/dist/bin.js"));
-    expect(cliBin(env)).toBe(join(repos, "nearpay-cli/dist/cli.js"));
+    expect(agentkitEntry("mcp", env, old)).toMatch(/^file:.*packages\/mcp\/dist\/index\.js$/);
+    expect((await loadAgentkit("mcp", env, none)).name).toBe("mcp");
+    expect(mcpBin(env, none)).toBe(join(repos, "nearpay-agentkit/packages/mcp/dist/bin.js"));
+    expect(cliBin(env, none)).toBe(join(repos, "nearpay-cli/dist/cli.js"));
     expect(nodeArgs("/e.js", ["a"])).toEqual(["--import", PRELOAD, "/e.js", "a"]);
   });
 });

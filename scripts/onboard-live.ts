@@ -10,7 +10,8 @@
  *   2. name      — the account's display name follows `--business`.
  *   3. destination — live USDC NEAR Intents destination for the merchant key's implicit account;
  *                  the NEP-413 attestation is signed in Node with that key (`--merchant-key`).
- *   4. cool-off  — Stage 1 ops CLI skip (local stacks).
+ *   4. activation — active as soon as attested (ADR-0027, `NP_COOLOFF_SECONDS=0`); only on a stack that
+ *                  sets a cool-off is it ended with the ops CLI skip (local stacks).
  *   5. KYB       — self-declared business details submitted through the API; compliance decides at
  *                  once (NP_KYB_MODE=auto, ADR-0024) → `live_enabled`. Only `--kyb-mode manual`
  *                  decides the case with the ops CLI.
@@ -345,7 +346,8 @@ async function signUp(c: Ctx): Promise<void> {
   await page.getByText("Email verified").waitFor({ timeout: 30_000 });
   await page.getByLabel("Business name").fill(c.o.business);
   await page.getByRole("button", { name: "Create passkey and open dashboard" }).click();
-  await page.getByTestId("account-name").waitFor({ timeout: 30_000 });
+  // the shell keeps the account name in a hidden element: wait for it to be attached, not visible
+  await page.getByTestId("account-name").waitFor({ state: "attached", timeout: 30_000 });
   // keep the credential before anything else can fail: without it the account cannot sign in again
   savePasskeyNow(c, await credentials(c.b));
   log(`      passkey saved to ${c.o.passkeyFile} (0600)`);
@@ -408,7 +410,7 @@ async function ensureAccount(c: Ctx): Promise<{ accountId: string; displayName: 
     await signUp(c);
   }
   await c.b.page.goto(`${c.dashboardUrl}/`);
-  await c.b.page.getByTestId("account-name").waitFor({ timeout: 30_000 });
+  await c.b.page.getByTestId("account-name").waitFor({ state: "attached", timeout: 30_000 });
   const s = await c.api.session();
   if (!s) throw new Error("signed in, but the dashboard has no session");
   // a resident passkey names its own user: never carry on as someone other than --email
@@ -504,7 +506,7 @@ async function ensureDestination(c: Ctx, accountId: string): Promise<Destination
       d = await c.api.call<Destination>("GET", `/v1/settlement_destinations/${d.id}`);
     }
   } else {
-    step(4, `cool-off: ${d.status === "active" ? "done" : d.status}`);
+    step(4, `activation: ${d.status === "active" ? "active (no cool-off on this stack)" : d.status}`);
   }
   if (d.status !== "active") throw new Error(`destination ${d.id} is ${d.status}, expected active`);
   if (!d.is_default) {
