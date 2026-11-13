@@ -79,6 +79,16 @@ pnpm demo:agent --live             # mainnet (step 1.5): NP_AGENT_SECRET_KEY(_FI
 
 Live mode (step 1.5): `demo:checkout` prints the hosted checkout URL for a human with an EVM wallet.
 
+**`*.nearpay.localhost` on Linux.** Browsers and curl resolve `*.localhost` themselves; Node asks the system
+resolver, and glibc without `nss-myhostname` (containers, WSL without systemd, minimal servers) answers
+`ENOTFOUND`: check with `getent hosts api.nearpay.localhost`. The demo scripts and the suites load
+`lib/localhost-dns.ts`, so they work either way. Any other Node program you point at the local stack (for example
+the CLI built from `../nearpay-cli`) needs the same lookup, from this directory:
+
+```sh
+export NODE_OPTIONS="--import $PWD/lib/localhost-dns-preload.mjs"
+```
+
 **Agent funding (test mode).** The sandbox Verifier keeps simulated Intents balances; the demo agent
 (test-only key, implicit account `0857962d91335176f92257df38175401936a4ca31b832f0c98c77b836800c655`)
 needs USDC there before `demo:agent`, T3, T4 and T5. There is no public route for it: `seed.sh data`
