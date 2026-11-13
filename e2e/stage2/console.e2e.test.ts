@@ -16,12 +16,14 @@ import {
   createSettlementDestination,
   getAccount,
   getKyb,
+  getSettlementDestination,
   startKyb,
   submitKyb,
   updateKybProfile,
 } from "@nearpay-money/spec";
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { describe, expect, it } from "vitest";
+import { ensureDestinationActive } from "../../lib/destinations.js";
 import { base58Encode, signNep413, USDC_NEAR } from "../../lib/onboard.js";
 import { DashboardSession, opsRoute } from "../../lib/ops-console.js";
 import { TURNSTILE_TEST_TOKEN } from "../../lib/payer.js";
@@ -86,7 +88,8 @@ describe.skipIf(!realStack)("Stage 2 · console smoke", () => {
     const account = await merchant.call<{ id: string; live_enabled: boolean; kyb_status: string }>(getAccount);
     expect(account).toMatchObject({ live_enabled: false, kyb_status: "not_started" });
 
-    // live destination: an implicit NEAR Intents account proves control with NEP-413, then the cool-off skip
+    // live destination: an implicit NEAR Intents account proves control with NEP-413 and is active at once
+    // (ADR-0027, NP_COOLOFF_SECONDS=0); only a stack that sets a cool-off needs the ops CLI skip
     const seed = ed25519.utils.randomSecretKey();
     const pub = ed25519.getPublicKey(seed);
     const key = { accountId: Buffer.from(pub).toString("hex"), publicKey: `ed25519:${base58Encode(pub)}`, seed };
@@ -108,8 +111,12 @@ describe.skipIf(!realStack)("Stage 2 · console smoke", () => {
       params: { id: d.id },
       body: { challenge_id: ch.id, standard: "nep413", ...signNep413(key, ch) },
     });
-    const skip = ops("identity-api", ["destination-cooloff-skip", d.id, "--actor", "testbed:e2e"]);
-    expect(skip.code, skip.stderr).toBe(0);
+    await ensureDestinationActive({
+      id: d.id,
+      status: async () =>
+        (await merchant.call<{ status: string }>(getSettlementDestination, { params: { id: d.id } })).status,
+      skipCooloff: () => ops("identity-api", ["destination-cooloff-skip", d.id, "--actor", "testbed:e2e"]),
+    });
     merchant.mode = undefined;
 
     // self-declared business details (ADR-0020 d3), submitted with the owner's declaration; no

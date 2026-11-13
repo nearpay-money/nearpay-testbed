@@ -41,6 +41,8 @@ export const SENTINEL_KEY = { kid: "sent-test-1", public_key: "LHE3Fv7ETKuSmfJWA
 const SENTINEL_SEED = Buffer.from("61e0b1dbd70fa10f50b34184f3e7400a8885845481d0519d0ae9535665c4d3e9", "hex");
 const SD = "sd_01jbz9k3m4n5p6q7r8s9t0v1w2";
 const PAY_TO = "merchant-demo.near";
+/** Settlement transaction of the mock's succeeded attempts (a NEAR transaction hash shape; nothing real). */
+const MOCK_TX = "4reLvkAWfqk5fsqio1KLudk46cqRz9erQdaHkWZKMJDZ";
 const FINGERPRINT = "YZMN-R81Z-BR";
 
 let counter = 0;
@@ -182,7 +184,23 @@ export async function startMockStack(o: { payUrl?: string } = {}): Promise<MockS
     deadline: a.deposit ? Math.floor(Date.parse(a.deposit.deadline) / 1000) : null,
     is_overpayment: false,
     failure_code: null,
-    evidence: null,
+    // INV-2: a succeeded attempt carries verified evidence (the scenario suite asserts it)
+    evidence:
+      a.status === "succeeded"
+        ? {
+            chain: "near:mainnet",
+            tx_hash: MOCK_TX,
+            block_ref: null,
+            recipient: PAY_TO,
+            asset_id: USDC,
+            amount: s.settled,
+            finality: "final",
+            tier: "A",
+            source: "indexer",
+            observed_at: new Date((s.succeededAt ?? nowS()) * 1000).toISOString(),
+            explorer_url: null,
+          }
+        : null,
   });
   const intentView = (s: Session) => ({
     id: s.intentId,

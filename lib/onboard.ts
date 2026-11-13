@@ -448,9 +448,9 @@ export interface OnboardOptions {
 export const ONBOARD_USAGE = `usage: pnpm onboard:live [options]
 
 Onboards the demo merchant on the local stack end to end (sign-up or passkey sign-in, live NEAR
-Intents destination signed with the merchant key, cool-off skip, business details (live at once in
-NP_KYB_MODE=auto), live secret key, live webhook
-endpoint). Safe to re-run: it continues from wherever the last run stopped.
+Intents destination signed with the merchant key (active at once; a cool-off is skipped only on a stack
+that sets NP_COOLOFF_SECONDS > 0), business details (live at once in NP_KYB_MODE=auto), live secret key,
+live webhook endpoint). Safe to re-run: it continues from wherever the last run stopped.
 
   --email <addr>          merchant email (NP_ONBOARD_EMAIL; default ${DEFAULT_EMAIL})
   --business <name>       business name (NP_ONBOARD_BUSINESS; default "${DEFAULT_BUSINESS}")

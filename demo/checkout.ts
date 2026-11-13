@@ -11,6 +11,7 @@
  * Options: --amount <cents> (test mode; sandbox scenario = last two digits), --no-pay (only create
  * and wait), --timeout <s> (default 120 test / 900 live). Stack locations: lib/stack.ts.
  */
+import "../lib/localhost-dns.js"; // *.localhost → loopback: glibc without nss-myhostname does not resolve these names
 import { parseArgs } from "node:util";
 import { merchantDemo } from "../lib/merchant-demo.js";
 import { payBySimulatedDeposit, sessionFromUrl } from "../lib/payer.js";
@@ -63,7 +64,7 @@ export async function runCheckoutDemo(
         ...(deps.fetch ? { fetch: deps.fetch } : {}),
       });
       log(
-        `    attested merchant: ${paid.merchant.name}${paid.merchant.kyb_verified ? " (KYB verified)" : ""}  destination ${paid.fingerprint}`,
+        `    attested merchant: ${paid.merchant.name}${paid.merchant.kyb_verified ? " (business details declared)" : ""}  destination ${paid.fingerprint}`,
       );
       log(
         `    deposit ${paid.attempt.deposit?.amount_in} → ${paid.attempt.deposit?.address} on ${paid.attempt.deposit?.chain} (simulated)`,

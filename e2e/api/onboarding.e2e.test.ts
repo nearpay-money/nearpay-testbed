@@ -1,6 +1,6 @@
 /**
  * T1 — merchant onboarding: dashboard passkey sign-up → magic link (Mailpit) → destination +
- * wallet attestation → cool-off → business details (decided at once in NP_KYB_MODE=auto, ADR-0024)
+ * wallet attestation → active at once (ADR-0027) → business details (decided at once in NP_KYB_MODE=auto, ADR-0024)
  * → live. The whole flow runs in the browser in e2e/dashboard/onboarding.pw.ts (`NP_E2E=1 pnpm
  * test:pw`: virtual WebAuthn authenticator, real NEP-413 signature); this suite covers the ops half
  * through the Stage 1 ops CLI — the manual KYB decision only when the stack runs NP_KYB_MODE=manual.

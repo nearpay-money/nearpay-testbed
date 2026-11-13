@@ -1,7 +1,9 @@
 /**
  * Stage 3 client artifacts the E2E suites run (step 3.4): `@nearpay-money/cli`, `@nearpay-money/mcp`, `@nearpay-money/x402` and
- * `@nearpay-money/agent-signer` 0.2.0. A package installed here (from the local registry) at the minimum version wins;
- * otherwise the build output of the repository's main checkout is used — never its source:
+ * `@nearpay-money/agent-signer` 0.2.0. All four are devDependencies or dependencies of this repo (published packages
+ * from the registry `nearpay-deploy` seeds), so `pnpm run setup` is enough: nothing has to be built in a sibling
+ * repository. A package installed here at the minimum version wins; otherwise (an older install, or `NP_CLI_BIN` set
+ * to try a local build) the build output of the repository's main checkout is used — never its source:
  *
  * | Variable | Default | Used |
  * |---|---|---|
@@ -48,10 +50,17 @@ export function installedVersion(name: string): string | null {
 export type AgentkitPackage = "x402" | "agent-signer" | "mcp";
 export const AGENTKIT_MIN = "0.2.0";
 
+/** Looks up the installed version of a package (tests replace it to exercise the build-output fallback). */
+export type InstalledLookup = (name: string) => string | null;
+
 /** Where a Stage 3 agentkit package is loaded from (an installed package id or a file URL of its dist). */
-export function agentkitEntry(pkg: AgentkitPackage, env: Env = process.env): string {
+export function agentkitEntry(
+  pkg: AgentkitPackage,
+  env: Env = process.env,
+  installed: InstalledLookup = installedVersion,
+): string {
   const name = `@nearpay-money/${pkg}`;
-  const v = installedVersion(name);
+  const v = installed(name);
   if (v && atLeast(v, AGENTKIT_MIN)) return name;
   const dir = resolve(env.NP_AGENTKIT_DIR ?? join(reposDir(env), "nearpay-agentkit"));
   const entry = join(dir, "packages", pkg, "dist", "index.js");
@@ -64,13 +73,17 @@ export function agentkitEntry(pkg: AgentkitPackage, env: Env = process.env): str
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: the module shapes come from packages this repo does not depend on yet
-export async function loadAgentkit<T = any>(pkg: AgentkitPackage, env: Env = process.env): Promise<T> {
-  return (await import(agentkitEntry(pkg, env))) as T;
+export async function loadAgentkit<T = any>(
+  pkg: AgentkitPackage,
+  env: Env = process.env,
+  installed: InstalledLookup = installedVersion,
+): Promise<T> {
+  return (await import(agentkitEntry(pkg, env, installed))) as T;
 }
 
 /** `nearpay-mcp` stdio entry (`@nearpay-money/mcp` bin). */
-export function mcpBin(env: Env = process.env): string {
-  const entry = agentkitEntry("mcp", env);
+export function mcpBin(env: Env = process.env, installed: InstalledLookup = installedVersion): string {
+  const entry = agentkitEntry("mcp", env, installed);
   if (entry.startsWith("file:")) return join(dirname(fileURLToPath(entry)), "bin.js");
   const req = createRequire(join(testbed, "package.json"));
   return join(dirname(req.resolve("@nearpay-money/mcp/package.json")), "dist", "bin.js");
@@ -79,9 +92,9 @@ export function mcpBin(env: Env = process.env): string {
 export const CLI_MIN = "0.1.0";
 
 /** `nearpay` CLI entry. */
-export function cliBin(env: Env = process.env): string {
+export function cliBin(env: Env = process.env, installed: InstalledLookup = installedVersion): string {
   if (env.NP_CLI_BIN) return resolve(env.NP_CLI_BIN);
-  const v = installedVersion("@nearpay-money/cli");
+  const v = installed("@nearpay-money/cli");
   if (v && atLeast(v, CLI_MIN)) {
     const req = createRequire(join(testbed, "package.json"));
     return join(dirname(req.resolve("@nearpay-money/cli/package.json")), "dist", "cli.js");

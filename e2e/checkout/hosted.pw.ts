@@ -1,12 +1,14 @@
 /**
  * Full stack (step 1.4, NP_E2E=1): a payer in the browser — merchant-demo "Pay USD 2.00" → hosted
- * checkout (nearpay-checkout) in test mode → manual path, USDC on Base → sentinel-verified merchant
- * and destination fingerprint → network confirmation reveals the address → "Simulate payment" →
- * success redirect, and the signed webhook for this very intent at merchant-demo (T2/T6 through the
- * UI; checkout LLD §5 rules 2, 8, 9). Selectors are the checkout's own test ids (its test/e2e).
+ * checkout (nearpay-checkout) in test mode → manual path ("Send from an exchange or wallet") → "Pay with":
+ * network Base, token USDC, Continue → refund address → sentinel-verified merchant and destination
+ * fingerprint → network confirmation reveals the address → "Simulate payment" → success redirect, and
+ * the signed webhook for this very intent at merchant-demo (T2/T6 through the UI; checkout LLD §5 rules
+ * 2, 8, 9). Selectors are the checkout's own test ids (its test/e2e, layout of 2026-11-12).
  */
 import "../../lib/localhost-dns.js";
 import { expect, test } from "@playwright/test";
+import { BASE_CHAIN, choosePayWith } from "../support/checkout-ui.js";
 
 const USDC_BASE = "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near";
 /** A checksummed Base refund address (test mode; never receives anything real). */
@@ -40,13 +42,15 @@ test("hosted checkout in test mode: attested merchant, simulate payment, success
   await expect(page.getByTestId("price")).toHaveText("$2.00");
 
   await page.getByTestId("path-manual").click();
-  await page.getByTestId(`option-route_quote-${USDC_BASE}`).click();
+  await choosePayWith(page, { chain: BASE_CHAIN, method: "route_quote", asset: USDC_BASE });
+  await expect(page.getByTestId("refund-form")).toBeVisible();
   await page.getByTestId("refund-address").fill(REFUND);
   await page.getByTestId("continue").click();
 
   // rule 2: merchant identity and fingerprint come from sentinel's verified co-signature (Stage 2 checkout:
   // shown in the "Payment details" dialog)
-  await page.getByTestId("payment-details").click({ timeout: 30_000 });
+  await expect(page.getByTestId("manual-instructions")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("payment-details").click();
   await expect(page.getByRole("dialog", { name: "Payment details" })).toBeVisible();
   await expect(page.getByTestId("merchant-name")).not.toBeEmpty();
   await expect(page.getByTestId("fingerprint")).toHaveText(/^[0-9A-Z]{4}-[0-9A-Z]{4}-[0-9A-Z]{2}$/);

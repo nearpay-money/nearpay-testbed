@@ -10,6 +10,7 @@
  * Options: --live (salt from NEAR RPC, `NP_NEAR_RPC_URLS`), --max <base units> (spend limit on
  * amount + fee, default 100000 = 0.10 USDC), --asset <asset id> (default USDC), --timeout <s>.
  */
+import "../lib/localhost-dns.js"; // *.localhost → loopback: glibc without nss-myhostname does not resolve these names
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import { type IntentSigner, nearSigner, rpcSaltProvider, staticSaltProvider } from "@nearpay-money/agent-signer";
